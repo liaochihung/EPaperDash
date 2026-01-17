@@ -5,6 +5,7 @@ import AppHeader from './components/AppHeader.vue';
 import ToolSidebar from './components/ToolSidebar.vue';
 import EditToolbar from './components/EditToolbar.vue';
 import PropertiesPanel from './components/PropertiesPanel.vue';
+import DeviceSettingsDialog from './components/DeviceSettingsDialog.vue';
 
 import { useWebSerial } from './composables/useWebSerial';
 import { useFirmwareUpload } from './composables/useFirmwareUpload';
@@ -12,7 +13,32 @@ import { displayOptions, colorModes } from './constants/displays';
 
 const canvasEditorRef = ref(null);
 const selectedObject = ref(null);
-const { isConnected, connect, disconnect, sendBinary } = useWebSerial();
+const { isConnected, connect, disconnect, sendBinary, sendJSON, onLineReceived } = useWebSerial();
+
+// Dialogs
+const isSettingsOpen = ref(false);
+const settingsDialogRef = ref(null);
+
+// Handle incoming serial data
+onLineReceived.value = (line) => {
+    try {
+        const data = JSON.parse(line);
+        console.log("RX:", data);
+        
+        // Route to Dialog if scanning
+        if (data.result === 'scan_complete' && data.networks) {
+            settingsDialogRef.value?.updateWifiList(data.networks);
+        }
+        
+        // Handle other async responses if needed
+    } catch (e) {
+        // Not JSON or partial, ignore
+    }
+};
+
+const handleSendCommand = (cmdObj) => {
+    sendJSON(cmdObj);
+};
 
 const selectedDisplay = ref(displayOptions.find(d => d.width === 648) || displayOptions[0]); // Default to user's 5.83"
 const selectedColorMode = ref(colorModes[0]);
@@ -223,6 +249,7 @@ watch(selectedObject, (newVal) => {
         v-model:selected-color-mode="selectedColorMode"
         @connect="handleConnect"
         @upload="handleUpload"
+        @open-settings="isSettingsOpen = true"
       />
 
       <!-- Edit Toolbar -->
@@ -250,6 +277,14 @@ watch(selectedObject, (newVal) => {
     <PropertiesPanel
       :selected-object="selectedObject"
       :selected-color-mode="selectedColorMode"
+    />
+
+    <!-- Dialogs -->
+    <DeviceSettingsDialog 
+        ref="settingsDialogRef"
+        :is-open="isSettingsOpen"
+        @close="isSettingsOpen = false"
+        @send-command="handleSendCommand"
     />
   </div>
 </template>

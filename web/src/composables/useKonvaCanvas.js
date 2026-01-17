@@ -232,12 +232,30 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         }
     };
 
-    const getDataURL = () => {
+    const getDataURL = (options = {}) => {
         if (!stage.value || !paperGroup.value) return null;
+
+        const { excludeDynamic } = options;
+        const hiddenNodes = [];
 
         // Hide transformer
         const oldNodes = transformer.value.nodes();
         transformer.value.nodes([]);
+
+        // Hide dynamic nodes if requested
+        if (excludeDynamic) {
+            const children = paperGroup.value.getChildren();
+            children.forEach(node => {
+                const type = node.getAttr('nodeType');
+                if (['time', 'date', 'weather'].includes(type)) {
+                    if (node.visible()) {
+                        node.hide();
+                        hiddenNodes.push(node);
+                    }
+                }
+            });
+        }
+
         layer.value.batchDraw();
 
         const bg = paperGroup.value.findOne('#paper-bg');
@@ -250,6 +268,9 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             height: props.height,
             pixelRatio: 1
         });
+
+        // Restore visibility
+        hiddenNodes.forEach(node => node.show());
 
         // Restore transformer
         transformer.value.nodes(oldNodes);
