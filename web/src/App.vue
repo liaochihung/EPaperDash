@@ -65,6 +65,7 @@ onMounted(() => {
     }
 
     // Start auto-refresh timer (every minute)
+    /* 
     const refreshInterval = setInterval(async () => {
         if (!canvasEditorRef.value || !isConnected.value) return;
 
@@ -79,43 +80,44 @@ onMounted(() => {
 
         // Update each dynamic node
         for (const node of dynamicNodes) {
-            const nodeId = node.attrs.id;
-            let newText = node.attrs.text;
+             const nodeId = node.attrs.id;
+             let newText = node.attrs.text;
 
-            if (node.attrs.nodeType === 'time') {
-                const now = new Date();
-                newText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            } else if (node.attrs.nodeType === 'date') {
-                const now = new Date();
-                newText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            }
-            // Weather would require API call - skip for now
+             if (node.attrs.nodeType === 'time') {
+                 const now = new Date();
+                 newText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+             } else if (node.attrs.nodeType === 'date') {
+                 const now = new Date();
+                 newText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+             }
+             // Weather would require API call - skip for now
 
-            if (newText !== node.attrs.text) {
-                // Update node text
-                canvasEditorRef.value.updateNode(nodeId, { text: newText });
+             if (newText !== node.attrs.text) {
+                 // Update node text
+                 canvasEditorRef.value.updateNode(nodeId, { text: newText });
 
-                // Increment counter
-                updateCounter.value++;
+                 // Increment counter
+                 updateCounter.value++;
 
-                // Decide: Partial or Full refresh?
-                if (updateCounter.value >= FULL_REFRESH_INTERVAL) {
-                    console.log('Full refresh triggered');
-                    await uploadToScreen(canvasEditorRef.value, selectedDisplay.value, selectedColorMode.value);
-                    updateCounter.value = 0;
-                } else {
-                    // Partial update for this node's area
-                    const x = Math.round(node.attrs.x);
-                    const y = Math.round(node.attrs.y);
-                    const width = Math.round(node.attrs.width || 200);
-                    const height = Math.round(node.attrs.height || 50);
-                    
-                    console.log(`Partial update for ${nodeId}`);
-                    await uploadPartialUpdate(canvasEditorRef.value, x, y, width, height, selectedColorMode.value);
-                }
-            }
+                 // Decide: Partial or Full refresh?
+                 if (updateCounter.value >= FULL_REFRESH_INTERVAL) {
+                     console.log('Full refresh triggered');
+                     await uploadToScreen(canvasEditorRef.value, selectedDisplay.value, selectedColorMode.value);
+                     updateCounter.value = 0;
+                 } else {
+                     // Partial update for this node's area
+                     const x = Math.round(node.attrs.x);
+                     const y = Math.round(node.attrs.y);
+                     const width = Math.round(node.attrs.width || 200);
+                     const height = Math.round(node.attrs.height || 50);
+                     
+                     console.log(`Partial update for ${nodeId}`);
+                     await uploadPartialUpdate(canvasEditorRef.value, x, y, width, height, selectedColorMode.value);
+                 }
+             }
         }
     }, 60000); // Every 60 seconds
+    */
 
     // Cleanup on unmount
     onUnmounted(() => {
@@ -178,6 +180,53 @@ const handleAddDate = () => {
 
 const handleAddWeather = () => {
     canvasEditorRef.value?.addWeatherNode();
+};
+
+const handleSaveProject = () => {
+    if (!canvasEditorRef.value) return;
+    
+    const state = canvasEditorRef.value.exportState();
+    if (!state) return;
+    
+    const blob = new Blob([state], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `epaper-layout-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
+
+const handleLoadProject = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const content = event.target.result;
+            try {
+                JSON.parse(content); // Validate JSON
+                if (canvasEditorRef.value) {
+                    canvasEditorRef.value.importState(content);
+                    localStorage.setItem('epaper_dash_layout', content);
+                }
+            } catch (err) {
+                console.error("Failed to load project", err);
+                alert("Error: Invalid project file");
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    fileInput.click();
 };
 
 // Keyboard handling
@@ -252,6 +301,8 @@ watch(selectedObject, (newVal) => {
         v-model:selected-color-mode="selectedColorMode"
         @connect="handleConnect"
         @upload="handleUpload"
+        @save="handleSaveProject"
+        @load="handleLoadProject"
         @open-settings="isSettingsOpen = true"
       />
 

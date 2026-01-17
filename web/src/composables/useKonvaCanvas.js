@@ -198,7 +198,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                 width: 200,
                 height: 200,
                 draggable: true,
-                id: `image-${Date.now()}`
+                id: `image-${Date.now()}`,
+                imageSrc: url
             });
             setupCursorEvents(img);
             paperGroup.value.add(img);
@@ -296,8 +297,14 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             // Clear existing
             const children = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg');
             children.forEach(c => c.destroy());
+            transformer.value.nodes([]); // Clear selection
 
             data.forEach(item => {
+                // Ensure draggable is preserved or defaulted to true
+                if (item.attrs) {
+                    item.attrs.draggable = true;
+                }
+
                 if (item.className === 'Text') {
                     const node = new Konva.Text(item.attrs);
                     // Re-add custom hitFunc
@@ -310,11 +317,19 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                     setupCursorEvents(node);
                     paperGroup.value.add(node);
                 } else if (item.className === 'Image') {
-                    Konva.Image.fromURL(item.attrs.imageSrc || item.attrs.url, (img) => {
-                        img.setAttrs(item.attrs);
-                        setupCursorEvents(img);
-                        paperGroup.value.add(img);
-                    });
+                    const src = item.attrs.imageSrc || item.attrs.url;
+                    if (src) {
+                        Konva.Image.fromURL(src, (img) => {
+                            // Clean attrs to prevent overwriting the image object with invalid data from JSON
+                            const cleanAttrs = { ...item.attrs };
+                            delete cleanAttrs.image;
+
+                            img.setAttrs(cleanAttrs);
+                            setupCursorEvents(img);
+                            paperGroup.value.add(img);
+                            layer.value.batchDraw();
+                        });
+                    }
                 }
             });
             layer.value.batchDraw();
