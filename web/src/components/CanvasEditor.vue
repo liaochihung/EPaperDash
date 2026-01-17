@@ -205,6 +205,43 @@ const getDataURL = () => {
     return dataURL;
 };
 
+const addImage = (url) => {
+    if(!layer) return;
+    const paperBg = layer.findOne('#paper-bg');
+    const startX = paperBg.x() + 50;
+    const startY = paperBg.y() + 50;
+
+    Konva.Image.fromURL(url, (imageNode) => {
+        imageNode.setAttrs({
+            x: startX,
+            y: startY,
+            width: 200, // Default width
+            height: 200, // Default height preserving aspect ratio usually requires more logic, but Konva handles it ok-ish
+            draggable: true,
+            id: `image-${Date.now()}`
+        });
+
+        imageNode.on('mouseover', function () { document.body.style.cursor = 'pointer'; });
+        imageNode.on('mouseout', function () { document.body.style.cursor = 'default'; });
+
+        layer.add(imageNode);
+        transformer.nodes([imageNode]);
+        selectedId.value = imageNode.id();
+
+        emit('selected', {
+            id: imageNode.id(),
+            type: 'Image',
+            x: imageNode.x(),
+            y: imageNode.y(),
+            width: imageNode.width(),
+            height: imageNode.height(),
+            scaleX: imageNode.scaleX(),
+            scaleY: imageNode.scaleY(),
+            rotation: imageNode.rotation()
+        });
+    });
+};
+
 defineExpose({
     addText,
     addImage,
