@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, onUnmounted, defineExpose } from 'vue';
+import { onMounted, ref, onUnmounted, defineExpose, watch } from 'vue';
 import Konva from 'konva';
 
 const stageContainer = ref(null);

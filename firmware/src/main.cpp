@@ -1,25 +1,24 @@
 #include <Arduino.h>
-#include <GxEPD2_BW.h>
+#include <GxEPD2_3C.h>
 
 // --------------------------------------------------------
 // CONFIGURATION
 // --------------------------------------------------------
-// Display Selection: 7.5" 800x480 (Waveshare/GoodDisplay)
-// If you have a different display, change the class here.
+// Display Selection: 5.83" 648x480 3-Color (GxEPD2_583c_Z83)
 #define EPD_CS      5
 #define EPD_DC      17
 #define EPD_RST     16
 #define EPD_BUSY    4
 
 // Initialize proper display class
-// GxEPD2_750_T7: 800x480
-GxEPD2_BW<GxEPD2_750_T7, GxEPD2_750_T7::HEIGHT> display(GxEPD2_750_T7(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
+// GxEPD2_583c_Z83: 648x480
+GxEPD2_3C<GxEPD2_583c_Z83, GxEPD2_583c_Z83::HEIGHT> display(GxEPD2_583c_Z83(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
 
 // Buffer for incoming data
-// 800x480 bits = 48000 bytes
+// 648x480 bits
 // We can allocate this statically or dynamically. 
 // Standard ESP32 has plenty of RAM.
-#define IMG_WIDTH 800
+#define IMG_WIDTH 648
 #define IMG_HEIGHT 480
 #define BUFFER_SIZE (IMG_WIDTH * IMG_HEIGHT / 8)
 
