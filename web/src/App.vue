@@ -1,13 +1,14 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import CanvasEditor from './components/CanvasEditor.vue';
 import { useWebSerial } from './composables/useWebSerial';
-import { dataURLtoImageData, floydSteinbergDithering, pack1Bit } from './utils/imageProcessing';
+import { dataURLtoImageData, floydSteinbergDithering, pack1Bit, pack3Color, pack4Bit, generateEPDPacket } from './utils/imageProcessing';
 
 const canvasEditorRef = ref(null);
 const selectedObject = ref(null);
 const { isConnected, connect, disconnect, sendBinary } = useWebSerial();
 const isUploading = ref(false);
+const fileInput = ref(null);
 
 const displayOptions = [
     // 1.02" to 1.54"
@@ -61,12 +62,67 @@ const colorModes = [
 ];
 const selectedColorMode = ref(colorModes[0]);
 
+const paletteMap = {
+    '1bit': ['#000000', '#ffffff'],
+    '3c': ['#000000', '#ffffff', '#ff0000'],
+    '4c': ['#000000', '#ffffff', '#ff0000', '#ffff00'],
+    '7c': ['#000000', '#ffffff', '#00ff00', '#0000ff', '#ff0000', '#ffff00', '#ffa500']
+};
+
 const handleAddText = () => {
     canvasEditorRef.value?.addText();
 };
 
 const handleAddImage = () => {
-    canvasEditorRef.value?.addImage();
+    fileInput.value?.click();
+};
+
+const onFileSelected = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            canvasEditorRef.value?.addImage(e.target.result);
+        };
+        reader.readAsDataURL(file);
+    }
+    // Reset input so same file can be selected again
+    event.target.value = '';
+};
+
+const handleKeydown = (e) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Only delete if not editing a text input (simple check)
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+            canvasEditorRef.value?.deleteSelected();
+        }
+    }
+};
+
+onMounted(() => {
+    globalThis.addEventListener('keydown', handleKeydown);
+    
+    // Restore state
+    const saved = localStorage.getItem('epaper_dash_layout');
+    if (saved) {
+        // Wait for CanvasEditor to be mounted and stage initialized
+        setTimeout(() => {
+            canvasEditorRef.value?.importState(saved);
+        }, 100);
+    }
+});
+
+onUnmounted(() => {
+    globalThis.removeEventListener('keydown', handleKeydown);
+});
+
+const handleCanvasChange = () => {
+    if (canvasEditorRef.value) {
+        const state = canvasEditorRef.value.exportState();
+        if (state) {
+            localStorage.setItem('epaper_dash_layout', state);
+        }
+    }
 };
 
 const handleSelected = (obj) => {
@@ -97,14 +153,32 @@ const handleUpload = async () => {
         
         console.log("Converting to ImageData...");
         const imageData = await dataURLtoImageData(dataURL);
+        console.log(`ImageData size: ${imageData.width}x${imageData.height}`);
+
+        if (selectedColorMode.value.id !== '3c') {
+            console.log("Applying dithering (1-bit mode only)...");
+            floydSteinbergDithering(imageData);
+        }
         
-        console.log("Dithering...");
-        floydSteinbergDithering(imageData);
+        console.log("Packing bits for mode: " + selectedColorMode.value.id);
+        let rawBody;
+        let modeId = 0; // Default 1-bit
+
+        if (selectedColorMode.value.id === '3c') {
+            rawBody = pack3Color(imageData);
+            modeId = 1;
+        } else if (selectedColorMode.value.id === '4c' || selectedColorMode.value.id === '7c') {
+            rawBody = pack4Bit(imageData, paletteMap[selectedColorMode.value.id]);
+            modeId = 2; // 4-bit Palette mode
+        } else {
+            rawBody = pack1Bit(imageData);
+            modeId = 0;
+        }
         
-        console.log("Packing bits...");
-        const binaryData = pack1Bit(imageData);
+        // Wrap in protocol packet
+        const binaryData = generateEPDPacket(selectedDisplay.value.width, selectedDisplay.value.height, modeId, rawBody);
         
-        console.log("Sending " + binaryData.length + " bytes...");
+        console.log("Sending " + binaryData.length + " bytes (Header + Payload)...");
         // Send Magic Header? Or just raw data for now?
         // Let's send a simple header: 'EPD' + Width(2) + Height(2) ?
         // For MVP, if firmware expects just raw 800*480/8 = 48000 bytes, send raw.
@@ -124,26 +198,39 @@ const handleUpload = async () => {
 // Watch for property changes in the side panel and update canvas
 watch(selectedObject, (newVal) => {
     if (newVal && canvasEditorRef.value) {
-        canvasEditorRef.value.updateNode(newVal.id, {
-            x: Number(newVal.x),
-            y: Number(newVal.y),
-            text: newVal.text,
-            fontSize: Number(newVal.fontSize),
-            width: Number(newVal.width),
-            height: Number(newVal.height),
-        });
+        const updateAttrs = {
+            x: Math.round(newVal.x),
+            y: Math.round(newVal.y)
+        };
+
+        if (newVal.type === 'Text') {
+            updateAttrs.text = newVal.text;
+            updateAttrs.fontSize = Math.round(newVal.fontSize);
+            updateAttrs.fill = newVal.fill;
+            updateAttrs.scaleX = 1;
+            updateAttrs.scaleY = 1;
+        } else if (newVal.type === 'Image') {
+            updateAttrs.width = Math.round(newVal.width);
+            updateAttrs.height = Math.round(newVal.height);
+            updateAttrs.scaleX = 1;
+            updateAttrs.scaleY = 1;
+        }
+
+        canvasEditorRef.value.updateNode(newVal.id, updateAttrs);
+        handleCanvasChange(); // Save on manual change
     }
 }, { deep: true });
 </script>
 
 <template>
   <div class="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
+    <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="onFileSelected" />
     <!-- Left Sidebar: Tools -->
-    <aside class="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-4 shadow-sm z-10 shrink-0">
+    <aside class="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-4 shadow-sm z-10 shrink-0" aria-label="Toolbox">
       <div class="font-bold text-[0.6rem] text-center mb-2 text-gray-500 uppercase">Tools</div>
       
       <button @click="handleAddText" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors group relative" aria-label="Add Text" title="Add Text">
-        <span class="font-serif font-bold text-xl">T</span>
+        <span class="font-serif font-bold text-xl" aria-hidden="true">T</span>
       </button>
       
       <button @click="handleAddImage" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors group relative" aria-label="Add Image" title="Add Image">
@@ -160,9 +247,9 @@ watch(selectedObject, (newVal) => {
     </aside>
 
     <!-- Center: Workspace -->
-    <main class="flex-1 flex flex-col relative min-w-0">
+    <main class="flex-1 flex flex-col relative min-w-0 bg-gray-100">
       <!-- Topbar -->
-      <header class="h-14 bg-white border-b border-gray-200 flex items-center px-6 justify-between shadow-sm z-20">
+      <header class="h-14 bg-white border-b border-gray-200 flex items-center px-6 justify-between shadow-sm z-20 shrink-0">
         <div class="flex items-center space-x-2">
             <h1 class="font-bold text-xl tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">EPaperDash</h1>
         </div>
@@ -204,12 +291,12 @@ watch(selectedObject, (newVal) => {
         </div>
       </header>
       
-      <!-- Canvas Area -->
-      <div class="flex-1 relative overflow-hidden bg-gray-100 flex items-center justify-center p-4">
-         <!-- This container handles the infinite bg feeling -->
+      <div class="flex-1 relative overflow-hidden flex flex-col">
          <CanvasEditor 
+            class="flex-1 w-full h-full"
             ref="canvasEditorRef" 
             @selected="handleSelected" 
+            @change="handleCanvasChange"
             :width="selectedDisplay.width" 
             :height="selectedDisplay.height"
          />
@@ -217,7 +304,7 @@ watch(selectedObject, (newVal) => {
     </main>
 
     <!-- Right Sidebar: Properties -->
-    <aside class="w-72 bg-white border-l border-gray-200 shadow-sm z-10 flex flex-col shrink-0 overflow-y-auto">
+    <aside class="w-72 bg-white border-l border-gray-200 shadow-sm z-10 flex flex-col shrink-0 overflow-y-auto" aria-label="Properties Panel">
       <div class="h-10 border-b border-gray-100 flex items-center px-4 bg-gray-50/50">
         <h2 class="font-bold text-xs text-gray-500 uppercase tracking-wide">Properties</h2>
       </div>
@@ -226,30 +313,45 @@ watch(selectedObject, (newVal) => {
           
           <!-- Common Properties -->
           <div class="space-y-3">
-              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Position</label>
+              <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Position</h3>
               <div class="grid grid-cols-2 gap-3">
                   <div>
                       <label for="prop-x" class="block text-xs text-gray-500 mb-1">X</label>
-                      <input id="prop-x" v-model="selectedObject.x" type="number" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                      <input id="prop-x" v-model.number="selectedObject.x" type="number" step="1" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
                   </div>
                   <div>
                       <label for="prop-y" class="block text-xs text-gray-500 mb-1">Y</label>
-                      <input id="prop-y" v-model="selectedObject.y" type="number" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                      <input id="prop-y" v-model.number="selectedObject.y" type="number" step="1" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
                   </div>
               </div>
           </div>
 
           <!-- Text Properties -->
           <div v-if="selectedObject.type === 'Text'" class="space-y-3">
-              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Typography</label>
+              <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Typography</h3>
                <div>
                   <label for="prop-content" class="block text-xs text-gray-500 mb-1">Content</label>
                   <textarea id="prop-content" v-model="selectedObject.text" rows="3" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
               </div>
                <div>
                   <label for="prop-fontsize" class="block text-xs text-gray-500 mb-1">Font Size</label>
-                   <input id="prop-fontsize" v-model="selectedObject.fontSize" type="number" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                   <input id="prop-fontsize" v-model.number="selectedObject.fontSize" type="number" step="1" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
               </div>
+               <!-- Color Palette -->
+               <div class="space-y-2">
+                  <span class="block text-xs text-gray-500">Color</span>
+                  <div class="flex flex-wrap gap-2">
+                      <button 
+                        v-for="color in paletteMap[selectedColorMode.id]" 
+                        :key="color"
+                        @click="selectedObject.fill = color"
+                        :style="{ backgroundColor: color }"
+                        :class="{ 'ring-2 ring-blue-500 ring-offset-2': selectedObject.fill === color }"
+                        class="w-6 h-6 rounded-full border border-gray-200 shadow-sm transition-all hover:scale-110"
+                        :title="color"
+                      ></button>
+                  </div>
+               </div>
           </div>
           
            <div class="pt-4 border-t border-gray-100">
