@@ -5,7 +5,8 @@ import {
     pack1Bit,
     pack3Color,
     pack4Bit,
-    generateEPDPacket
+    generateEPDPacket,
+    generatePartialEPDPacket
 } from '../utils/imageProcessing';
 import { paletteMap } from '../constants/displays';
 
@@ -65,8 +66,46 @@ export function useFirmwareUpload(sendBinary, isConnected) {
         }
     };
 
+    const uploadPartialUpdate = async (canvasEditor, x, y, width, height, selectedColorMode) => {
+        if (!isConnected.value) {
+            console.warn("Not connected, skipping partial update");
+            return;
+        }
+
+        if (!canvasEditor) return;
+
+        try {
+            console.log(`Partial update: ${x},${y} ${width}x${height}`);
+            const dataURL = canvasEditor.getPartialDataURL(x, y, width, height);
+
+            const imageData = await dataURLtoImageData(dataURL);
+
+            if (selectedColorMode.id !== '3c') {
+                floydSteinbergDithering(imageData);
+            }
+
+            let rawBody;
+            let modeId = 10; // Partial 1-bit
+
+            if (selectedColorMode.id === '3c') {
+                rawBody = pack3Color(imageData);
+                modeId = 11; // Partial 3-color
+            } else {
+                rawBody = pack1Bit(imageData);
+                modeId = 10;
+            }
+
+            const binaryData = generatePartialEPDPacket(x, y, width, height, modeId, rawBody);
+            await sendBinary(binaryData);
+            console.log("Partial update sent");
+        } catch (e) {
+            console.error("Partial update failed", e);
+        }
+    };
+
     return {
         isUploading,
-        uploadToScreen
+        uploadToScreen,
+        uploadPartialUpdate
     };
 }

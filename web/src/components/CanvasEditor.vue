@@ -30,6 +30,14 @@ const {
     getDataURL,
     exportState,
     importState,
+    toggleGrid,
+    bringToFront,
+    sendToBack,
+    copySelected,
+    addTimeNode,
+    addWeatherNode,
+    addDateNode,
+    getPartialDataURL,
     stage // access ref if needed for cleanup
 } = useKonvaCanvas(stageContainer, props, emit);
 
@@ -64,7 +72,15 @@ defineExpose({
     deleteSelected,
     getDataURL,
     exportState,
-    importState
+    importState,
+    toggleGrid,
+    bringToFront,
+    sendToBack,
+    copySelected,
+    addTimeNode,
+    addWeatherNode,
+    addDateNode,
+    getPartialDataURL
 });
 </script>
 

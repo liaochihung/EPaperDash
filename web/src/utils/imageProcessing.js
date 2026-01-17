@@ -213,3 +213,39 @@ export function generateEPDPacket(width, height, mode, body) {
     packet.set(body, header.length);
     return packet;
 }
+
+/**
+ * Partial Update Protocol:
+ * [Magic: EPD] (3 bytes)
+ * [Width] (2 bytes, Big Endian)
+ * [Height] (2 bytes, Big Endian)
+ * [Mode] (1 byte) -> 10: 1-bit partial, 11: 3-color partial
+ * [X] (2 bytes, Big Endian) - X coordinate of partial window
+ * [Y] (2 bytes, Big Endian) - Y coordinate of partial window
+ * [Body] (variable length)
+ */
+export function generatePartialEPDPacket(x, y, width, height, mode, body) {
+    const header = new Uint8Array(8);
+    header[0] = 0x45; // 'E'
+    header[1] = 0x50; // 'P'
+    header[2] = 0x44; // 'D'
+
+    header[3] = (width >> 8) & 0xFF;
+    header[4] = width & 0xFF;
+    header[5] = (height >> 8) & 0xFF;
+    header[6] = height & 0xFF;
+    header[7] = mode;
+
+    // Coordinates (4 additional bytes)
+    const coords = new Uint8Array(4);
+    coords[0] = (x >> 8) & 0xFF;
+    coords[1] = x & 0xFF;
+    coords[2] = (y >> 8) & 0xFF;
+    coords[3] = y & 0xFF;
+
+    const packet = new Uint8Array(header.length + coords.length + body.length);
+    packet.set(header);
+    packet.set(coords, header.length);
+    packet.set(body, header.length + coords.length);
+    return packet;
+}

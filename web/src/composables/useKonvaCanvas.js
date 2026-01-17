@@ -7,6 +7,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     const paperGroup = ref(null);
     const transformer = ref(null);
     const selectedId = ref(null);
+    const gridLayer = ref(null);
+    const showGrid = ref(false);
 
     const initStage = () => {
         if (!stageContainer.value) return;
@@ -51,6 +53,10 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         });
         paperGroup.value.add(bg);
 
+        // Grid Layer (on top of background, below content)
+        gridLayer.value = new Konva.Layer();
+        stage.value.add(gridLayer.value);
+
         // 4. Transformer
         transformer.value = new Konva.Transformer({
             anchorStroke: '#3b82f6',
@@ -89,6 +95,20 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             transformer.value.nodes([target]);
             selectedId.value = target.id();
             emitNodeProperties(target);
+        });
+
+        // Snap to grid on drag
+        stage.value.on('dragmove', (e) => {
+            if (!showGrid.value) return; // Only snap when grid is visible
+
+            const target = e.target;
+            if (target === stage.value || target.id() === 'paper-bg') return;
+
+            const gridSize = 20;
+            const x = Math.round(target.x() / gridSize) * gridSize;
+            const y = Math.round(target.y() / gridSize) * gridSize;
+
+            target.position({ x, y });
         });
 
         // Update properties on transform/drag end
@@ -307,6 +327,200 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         }
     };
 
+    // Grid Functions
+    const drawGrid = () => {
+        if (!gridLayer.value || !paperGroup.value) return;
+        gridLayer.value.destroyChildren();
+
+        const gridSize = 20;
+        const bg = paperGroup.value.findOne('#paper-bg');
+        const pos = bg.getAbsolutePosition();
+
+        for (let i = 0; i < props.width / gridSize; i++) {
+            gridLayer.value.add(new Konva.Line({
+                points: [pos.x + i * gridSize, pos.y, pos.x + i * gridSize, pos.y + props.height],
+                stroke: '#999',
+                strokeWidth: 1,
+                dash: [5, 5]
+            }));
+        }
+
+        for (let j = 0; j < props.height / gridSize; j++) {
+            gridLayer.value.add(new Konva.Line({
+                points: [pos.x, pos.y + j * gridSize, pos.x + props.width, pos.y + j * gridSize],
+                stroke: '#999',
+                strokeWidth: 1,
+                dash: [5, 5]
+            }));
+        }
+
+        gridLayer.value.batchDraw();
+    };
+
+    const toggleGrid = () => {
+        showGrid.value = !showGrid.value;
+        if (showGrid.value) {
+            drawGrid();
+        } else {
+            gridLayer.value.destroyChildren();
+            gridLayer.value.batchDraw();
+        }
+    };
+
+    // Layer Functions
+    const bringToFront = () => {
+        if (!selectedId.value || !paperGroup.value) return;
+        const node = paperGroup.value.findOne('#' + selectedId.value);
+        if (node && node.id() !== 'paper-bg') {
+            node.moveToTop();
+            layer.value.batchDraw();
+            emit('change');
+        }
+    };
+
+    const sendToBack = () => {
+        if (!selectedId.value || !paperGroup.value) return;
+        const node = paperGroup.value.findOne('#' + selectedId.value);
+        if (node && node.id() !== 'paper-bg') {
+            node.moveToBottom();
+            const bg = paperGroup.value.findOne('#paper-bg');
+            if (bg) bg.moveToBottom();
+            layer.value.batchDraw();
+            emit('change');
+        }
+    };
+
+    // Copy Function
+    const copySelected = () => {
+        if (!selectedId.value || !paperGroup.value) return;
+        const node = paperGroup.value.findOne('#' + selectedId.value);
+        if (!node || node.id() === 'paper-bg') return;
+
+        const clone = node.clone({
+            id: `${node.className.toLowerCase()}-${Date.now()}`,
+            x: node.x() + 20,
+            y: node.y() + 20
+        });
+
+        setupCursorEvents(clone);
+        paperGroup.value.add(clone);
+        selectNode(clone);
+        emit('change');
+    };
+
+    // Special Node Types
+    const addTimeNode = () => {
+        if (!paperGroup.value) return;
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        const text = new Konva.Text({
+            x: 50,
+            y: 50,
+            text: timeStr,
+            fontSize: 48,
+            fontFamily: 'monospace',
+            fill: 'black',
+            draggable: true,
+            id: `time-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'time', // Custom metadata
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        emit('change');
+    };
+
+    const addWeatherNode = () => {
+        if (!paperGroup.value) return;
+        const text = new Konva.Text({
+            x: 50,
+            y: 150,
+            text: '☀️ 72°F',
+            fontSize: 36,
+            fontFamily: 'sans-serif',
+            fill: 'black',
+            draggable: true,
+            id: `weather-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'weather', // Custom metadata
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        emit('change');
+    };
+
+    const addDateNode = () => {
+        if (!paperGroup.value) return;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+        const text = new Konva.Text({
+            x: 50,
+            y: 100,
+            text: dateStr,
+            fontSize: 32,
+            fontFamily: 'sans-serif',
+            fill: 'black',
+            draggable: true,
+            id: `date-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'date', // Custom metadata
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        emit('change');
+    };
+
+    // Partial Area Export
+    const getPartialDataURL = (x, y, width, height) => {
+        if (!stage.value) return null;
+
+        const oldNodes = transformer.value.nodes();
+        transformer.value.nodes([]);
+        layer.value.batchDraw();
+
+        const bg = paperGroup.value.findOne('#paper-bg');
+        const pos = bg.getAbsolutePosition();
+
+        const dataURL = stage.value.toDataURL({
+            x: Math.round(pos.x + x),
+            y: Math.round(pos.y + y),
+            width: width,
+            height: height,
+            pixelRatio: 1
+        });
+
+        transformer.value.nodes(oldNodes);
+        layer.value.batchDraw();
+
+        return dataURL;
+    };
+
     return {
         stage,
         initStage,
@@ -318,6 +532,14 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         getDataURL,
         exportState,
         importState,
-        updatePaperSize
+        updatePaperSize,
+        toggleGrid,
+        bringToFront,
+        sendToBack,
+        copySelected,
+        addTimeNode,
+        addWeatherNode,
+        addDateNode,
+        getPartialDataURL
     };
 }
