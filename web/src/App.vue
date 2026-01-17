@@ -43,6 +43,9 @@ const handleSendCommand = (cmdObj) => {
 const selectedDisplay = ref(displayOptions.find(d => d.width === 648) || displayOptions[0]); // Default to user's 5.83"
 const selectedColorMode = ref(colorModes[0]);
 
+// Attach sendJSON to sendBinary for useFirmwareUpload compatibility
+sendBinary.sendJSON = sendJSON;
+
 const { isUploading, uploadToScreen, uploadPartialUpdate } = useFirmwareUpload(sendBinary, isConnected);
 
 // Auto-refresh state

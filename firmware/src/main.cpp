@@ -6,6 +6,10 @@
 #include <ArduinoJson.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+// Fonts
+#include <Fonts/FreeSansBold12pt7b.h>
+#include <Fonts/FreeSansBold18pt7b.h>
+#include <Fonts/FreeSansBold24pt7b.h>
 
 // --------------------------------------------------------
 // CONFIGURATION
@@ -16,7 +20,8 @@
 #define EPD_BUSY    4
 
 // Display: 5.83" 648x480 3-Color
-GxEPD2_3C<GxEPD2_583c_Z83, GxEPD2_583c_Z83::HEIGHT> display(GxEPD2_583c_Z83(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
+// Display: 5.83" 648x480 3-Color. Use 120 lines page height to save RAM.
+GxEPD2_3C<GxEPD2_583c_Z83, 120> display(GxEPD2_583c_Z83(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
 
 // Buffers
 #define IMG_WIDTH 648
@@ -41,17 +46,36 @@ struct Config {
 };
 Config appConfig;
 
+// Widgets & Logic
+struct Widget {
+    String type;
+    int x;
+    int y;
+    int w;
+    int h;
+    String fmt;
+};
+#define MAX_WIDGETS 10
+Widget widgets[MAX_WIDGETS];
+int widgetCount = 0;
+
 bool isWifiConnected = false;
 unsigned long lastWeatherUpdate = 0;
 unsigned long lastTimeUpdate = 0;
+float currentTemp = 0.0;
+int currentWeatherCode = -1;
 
 // Function Prototypes
 void loadConfig();
 void saveConfig();
 void processSerialCommands();
 void cmdScanWifi();
-void cmdSetConfig(JsonObject doc);
+void cmdSetConfig(JsonDocument& doc);
+void cmdSetLayout(JsonDocument& doc);
 void connectToWifi();
+void fetchWeather();
+void renderOverlay(bool partial);
+void processBinaryProtocol();
 
 void setup() {
     Serial.begin(115200);
@@ -334,7 +358,7 @@ void fetchWeather() {
 void renderOverlay(bool partial) {
     if (widgetCount == 0 && partial) return; 
 
-    display.powerOn(); 
+    // display.powerOn(); // Not needed/available in this version
     display.setFullWindow(); // Always use full window for simplicity with GxEPD2 3C for now
     
     display.firstPage();
