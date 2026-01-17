@@ -7,9 +7,16 @@ let stage = null;
 let layer = null;
 let transformer = null;
 
-// E-Paper Resolution (Standard 7.5 inch)
-const MP_WIDTH = 800; 
-const MP_HEIGHT = 480;
+const props = defineProps({
+  width: {
+    type: Number,
+    default: 648
+  },
+  height: {
+    type: Number,
+    default: 480
+  }
+});
 
 // State
 const selectedId = ref(null);
@@ -33,14 +40,14 @@ onMounted(() => {
   stage.add(layer);
   
   // Draw E-Paper Boundary
-  const paperX = (width - MP_WIDTH) / 2;
-  const paperY = (height - MP_HEIGHT) / 2;
+  const paperX = (width - props.width) / 2;
+  const paperY = (height - props.height) / 2;
 
   const bg = new Konva.Rect({
     x: paperX,
     y: paperY,
-    width: MP_WIDTH,
-    height: MP_HEIGHT,
+    width: props.width,
+    height: props.height,
     fill: 'white',
     stroke: '#333',
     strokeWidth: 2,
@@ -131,6 +138,27 @@ onMounted(() => {
   });
 });
 
+
+watch(() => [props.width, props.height], ([newW, newH]) => {
+    if (!stage || !layer) return;
+    
+    const bg = layer.findOne('#paper-bg');
+    if (bg) {
+        // Recalculate centering
+        const stageW = stage.width();
+        const stageH = stage.height();
+        const paperX = (stageW - newW) / 2;
+        const paperY = (stageH - newH) / 2;
+        
+        bg.width(newW);
+        bg.height(newH);
+        bg.x(paperX);
+        bg.y(paperY);
+        
+        layer.batchDraw();
+    }
+});
+
 const updateNode = (id, attrs) => {
     if(!layer) return;
     const node = layer.findOne('#' + id);
@@ -184,18 +212,17 @@ const getDataURL = () => {
     // Recalculate paper position (same logic as onMounted)
     const width = stage.width();
     const height = stage.height();
-    const paperX = (width - MP_WIDTH) / 2;
-    const paperY = (height - MP_HEIGHT) / 2;
+    const paperX = (width - props.width) / 2;
+    const paperY = (height - props.height) / 2;
 
     // Hide transformer and grid before snapshot
     transformer.hide();
-    const layer = stage.findOne('Layer');
     
     const dataURL = stage.toDataURL({
         x: paperX,
         y: paperY,
-        width: MP_WIDTH,
-        height: MP_HEIGHT,
+        width: props.width,
+        height: props.height,
         pixelRatio: 1 // 1:1 for E-Paper
     });
 
