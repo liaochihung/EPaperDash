@@ -365,11 +365,11 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     };
 
     // Public Actions
-    const addText = () => {
+    const addText = (pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
         const text = new Konva.Text({
-            x: 50,
-            y: 50,
+            x: pos.x,
+            y: pos.y,
             text: 'New Text',
             fontSize: 30,
             fontFamily: 'sans-serif',
@@ -392,12 +392,12 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
-    const addImage = (url) => {
+    const addImage = (url, pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
         Konva.Image.fromURL(url, (img) => {
             img.setAttrs({
-                x: 50,
-                y: 50,
+                x: pos.x,
+                y: pos.y,
                 width: 200,
                 height: 200,
                 draggable: true,
@@ -492,10 +492,14 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
         // Hide dynamic nodes if requested
         if (excludeDynamic) {
+            const dynamicTypes = [
+                'time', 'date', 'weather',
+                'weather-temp', 'weather-humidity', 'weather-wind', 'weather-precip', 'weather-icon'
+            ];
             const children = paperGroup.value.getChildren();
             children.forEach(node => {
                 const type = node.getAttr('nodeType');
-                if (['time', 'date', 'weather'].includes(type) || node.name()?.includes('dynamic')) {
+                if (dynamicTypes.includes(type) || node.name()?.includes('dynamic')) {
                     if (node.visible()) {
                         node.hide();
                         hiddenNodes.push(node);
@@ -736,14 +740,14 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     };
 
     // Special Node Types
-    const addTimeNode = () => {
+    const addTimeNode = (pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
         const now = new Date();
         const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
         const text = new Konva.Text({
-            x: 50,
-            y: 50,
+            x: pos.x,
+            y: pos.y,
             text: timeStr,
             fontSize: 48,
             fontFamily: 'monospace',
@@ -768,12 +772,12 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     };
 
     // Advanced Weather Node (Group)
-    const addWeatherNode = () => {
+    const addWeatherNode = (pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
 
         const group = new Konva.Group({
-            x: 50,
-            y: 50,
+            x: pos.x,
+            y: pos.y,
             width: 200,
             height: 120,
             draggable: true,
@@ -839,14 +843,14 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
-    const addDateNode = () => {
+    const addDateNode = (pos = { x: 50, y: 100 }) => {
         if (!paperGroup.value) return;
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
         const text = new Konva.Text({
-            x: 50,
-            y: 100,
+            x: pos.x,
+            y: pos.y,
             text: dateStr,
             fontSize: 32,
             fontFamily: 'sans-serif',
@@ -870,11 +874,152 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
-    const addRect = () => {
+    // Weather Sub-Components (Independent Nodes)
+    const addWeatherTempNode = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const text = new Konva.Text({
+            x: pos.x,
+            y: pos.y,
+            text: '24°C',
+            fontSize: 36,
+            fontFamily: 'sans-serif',
+            fill: 'black',
+            draggable: true,
+            id: `weather-temp-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'weather-temp',
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        saveHistory();
+        emit('change');
+    };
+
+    const addWeatherHumidityNode = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const text = new Konva.Text({
+            x: pos.x,
+            y: pos.y,
+            text: '💧 65%',
+            fontSize: 20,
+            fontFamily: 'sans-serif',
+            fill: '#666',
+            draggable: true,
+            id: `weather-humidity-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'weather-humidity',
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        saveHistory();
+        emit('change');
+    };
+
+    const addWeatherWindNode = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const text = new Konva.Text({
+            x: pos.x,
+            y: pos.y,
+            text: '🍃 12km/h',
+            fontSize: 20,
+            fontFamily: 'sans-serif',
+            fill: '#666',
+            draggable: true,
+            id: `weather-wind-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'weather-wind',
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        saveHistory();
+        emit('change');
+    };
+
+    const addWeatherPrecipNode = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const text = new Konva.Text({
+            x: pos.x,
+            y: pos.y,
+            text: '☔ 20%',
+            fontSize: 20,
+            fontFamily: 'sans-serif',
+            fill: '#666',
+            draggable: true,
+            id: `weather-precip-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'weather-precip',
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        saveHistory();
+        emit('change');
+    };
+
+    const addWeatherIconNode = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const text = new Konva.Text({
+            x: pos.x,
+            y: pos.y,
+            text: '⛅',
+            fontSize: 48,
+            fontFamily: 'sans-serif',
+            fill: 'black',
+            draggable: true,
+            id: `weather-icon-${Date.now()}`,
+            name: 'editable-text',
+            nodeType: 'weather-icon',
+            hitFunc: function (context) {
+                context.beginPath();
+                context.rect(0, 0, this.width(), this.height());
+                context.closePath();
+                context.fillStrokeShape(this);
+            }
+        });
+
+        setupCursorEvents(text);
+        paperGroup.value.add(text);
+        selectNode(text);
+        saveHistory();
+        emit('change');
+    };
+
+    const addRect = (pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
         const rect = new Konva.Rect({
-            x: 50,
-            y: 50,
+            x: pos.x,
+            y: pos.y,
             width: 100,
             height: 100,
             fill: 'transparent',
@@ -891,11 +1036,11 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
-    const addCircle = () => {
+    const addCircle = (pos = { x: 100, y: 100 }) => {
         if (!paperGroup.value) return;
         const circle = new Konva.Circle({
-            x: 100,
-            y: 100,
+            x: pos.x,
+            y: pos.y,
             radius: 50,
             fill: 'transparent',
             stroke: 'black',
@@ -911,11 +1056,11 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
-    const addBatteryNode = () => {
+    const addBatteryNode = (pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
         const group = new Konva.Group({
-            x: 50,
-            y: 50,
+            x: pos.x,
+            y: pos.y,
             draggable: true,
             id: `battery-${Date.now()}`,
             name: 'editable-group'
@@ -1007,6 +1152,18 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         }
     };
 
+    const getRelativePointerPosition = () => {
+        if (!stage.value || !paperGroup.value) return { x: 0, y: 0 };
+
+        const transform = paperGroup.value.getAbsoluteTransform().copy();
+        transform.invert();
+
+        const pos = stage.value.getPointerPosition();
+        if (!pos) return { x: 0, y: 0 };
+
+        return transform.point(pos);
+    };
+
     return {
         stage,
         initStage,
@@ -1026,6 +1183,12 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         addTimeNode,
         addWeatherNode,
         addDateNode,
+        // Weather Sub-Components
+        addWeatherTempNode,
+        addWeatherHumidityNode,
+        addWeatherWindNode,
+        addWeatherPrecipNode,
+        addWeatherIconNode,
         getPartialDataURL,
         addRect,
         addCircle,
@@ -1036,6 +1199,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         resetHistory, // Expose reset
         canUndo,
         canRedo,
-        selectAll
+        selectAll,
+        getRelativePointerPosition
     };
 }

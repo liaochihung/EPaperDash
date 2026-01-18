@@ -1,7 +1,12 @@
 <script setup>
 import { ref } from 'vue';
 
-const emit = defineEmits(['add-text', 'add-image', 'add-time', 'add-date', 'add-weather', 'add-rect', 'add-circle', 'add-battery']);
+const emit = defineEmits([
+    'add-text', 'add-image', 'add-time', 'add-date', 'add-weather', 
+    'add-rect', 'add-circle', 'add-battery',
+    // Weather sub-components
+    'add-weather-temp', 'add-weather-humidity', 'add-weather-wind', 'add-weather-precip', 'add-weather-icon'
+]);
 const fileInput = ref(null);
 
 // Accordion State
@@ -142,6 +147,47 @@ const handleDragStart = (e, type, payload = null) => {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                         </svg>
                         <span class="text-[10px] text-gray-500 uppercase font-medium">Weather</span>
+                    </div>
+
+                    <!-- Weather Sub-Components -->
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-orange-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'weather-temp')"
+                        @click="$emit('add-weather-temp')"
+                    >
+                        <span class="text-lg font-bold text-orange-500 mb-1">°C</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Temp</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'weather-humidity')"
+                        @click="$emit('add-weather-humidity')"
+                    >
+                        <span class="text-xl mb-1">💧</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Humidity</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-green-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'weather-wind')"
+                        @click="$emit('add-weather-wind')"
+                    >
+                        <span class="text-xl mb-1">🍃</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Wind</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'weather-precip')"
+                        @click="$emit('add-weather-precip')"
+                    >
+                        <span class="text-xl mb-1">☔</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Precip</span>
                     </div>
                 </div>
             </div>

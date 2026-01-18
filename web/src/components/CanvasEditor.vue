@@ -37,6 +37,12 @@ const {
     addTimeNode,
     addWeatherNode,
     addDateNode,
+    // Weather sub-components
+    addWeatherTempNode,
+    addWeatherHumidityNode,
+    addWeatherWindNode,
+    addWeatherPrecipNode,
+    addWeatherIconNode,
     getPartialDataURL,
     addRect,
     addCircle,
@@ -46,6 +52,7 @@ const {
     canUndo,
     canRedo,
     selectAll,
+    getRelativePointerPosition,
     stage // access ref if needed for cleanup
 } = useKonvaCanvas(stageContainer, props, emit);
 
@@ -93,6 +100,12 @@ defineExpose({
     addTimeNode,
     addWeatherNode,
     addDateNode,
+    // Weather sub-components
+    addWeatherTempNode,
+    addWeatherHumidityNode,
+    addWeatherWindNode,
+    addWeatherPrecipNode,
+    addWeatherIconNode,
     getPartialDataURL,
     undo,
     redo,
@@ -106,19 +119,29 @@ defineExpose({
 
 const handleDrop = (e) => {
     e.preventDefault();
+    
+    // Update Konva's pointer position manually from the drop event
+    stage.value.setPointersPositions(e);
+    const pos = getRelativePointerPosition();
+    
     try {
         const raw = e.dataTransfer.getData('application/json');
         if (!raw) return;
         const { type } = JSON.parse(raw);
         
         switch (type) {
-            case 'text': addText(); break;
-            case 'time': addTimeNode(); break;
-            case 'date': addDateNode(); break;
-            case 'weather': addWeatherNode(); break;
-            case 'rect': addRect(); break;
-            case 'circle': addCircle(); break;
-            case 'battery': addBatteryNode(); break;
+            case 'text': addText(pos); break;
+            case 'time': addTimeNode(pos); break;
+            case 'date': addDateNode(pos); break;
+            case 'weather': addWeatherNode(pos); break;
+            case 'weather-temp': addWeatherTempNode(pos); break;
+            case 'weather-humidity': addWeatherHumidityNode(pos); break;
+            case 'weather-wind': addWeatherWindNode(pos); break;
+            case 'weather-precip': addWeatherPrecipNode(pos); break;
+            case 'weather-icon': addWeatherIconNode(pos); break;
+            case 'rect': addRect(pos); break;
+            case 'circle': addCircle(pos); break;
+            case 'battery': addBatteryNode(pos); break;
             default: break;
         }
     } catch (err) {

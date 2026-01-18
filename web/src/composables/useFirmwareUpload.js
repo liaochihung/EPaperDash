@@ -26,8 +26,12 @@ export function useFirmwareUpload(sendBinary, isConnected) {
             // 1. Extract and Send Layout Config (Dynamic Nodes)
             console.log("Extracting Layout...");
             const state = JSON.parse(canvasEditor.exportState());
+            const dynamicNodeTypes = [
+                'time', 'date', 'weather',
+                'weather-temp', 'weather-humidity', 'weather-wind', 'weather-precip', 'weather-icon'
+            ];
             const dynamicNodes = state
-                .filter(n => n.attrs.nodeType && ['time', 'date', 'weather'].includes(n.attrs.nodeType))
+                .filter(n => n.attrs.nodeType && dynamicNodeTypes.includes(n.attrs.nodeType))
                 .map(n => ({
                     id: n.attrs.id,
                     type: n.attrs.nodeType,

@@ -10,6 +10,7 @@ struct AppConfig {
     float lon;
     String timezone;
     long timezone_offset_sec;
+    int refresh_interval_sec = 300;  // 預設 5 分鐘
 };
 
 #endif

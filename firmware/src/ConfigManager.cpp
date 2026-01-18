@@ -12,6 +12,7 @@ void ConfigManager::load(AppConfig &config) {
     config.lon = preferences.getFloat("lon", 0.0);
     config.timezone = preferences.getString("tz", "UTC");
     config.timezone_offset_sec = preferences.getLong("tz_off", 0);
+    config.refresh_interval_sec = preferences.getInt("refresh", 300);
     preferences.end();
 }
 
@@ -23,5 +24,6 @@ void ConfigManager::save(const AppConfig &config) {
     preferences.putFloat("lon", config.lon);
     preferences.putString("tz", config.timezone);
     preferences.putLong("tz_off", config.timezone_offset_sec);
+    preferences.putInt("refresh", config.refresh_interval_sec);
     preferences.end();
 }

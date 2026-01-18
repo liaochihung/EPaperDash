@@ -106,6 +106,13 @@ const handleAddCircle = () => canvasEditorRef.value?.addCircle();
 const handleAddBattery = () => canvasEditorRef.value?.addBatteryNode();
 const handleSelectAll = () => canvasEditorRef.value?.selectAll();
 
+// Weather sub-components
+const handleAddWeatherTemp = () => canvasEditorRef.value?.addWeatherTempNode();
+const handleAddWeatherHumidity = () => canvasEditorRef.value?.addWeatherHumidityNode();
+const handleAddWeatherWind = () => canvasEditorRef.value?.addWeatherWindNode();
+const handleAddWeatherPrecip = () => canvasEditorRef.value?.addWeatherPrecipNode();
+const handleAddWeatherIcon = () => canvasEditorRef.value?.addWeatherIconNode();
+
 const handleSaveProject = () => {
     if (!canvasEditorRef.value) return;
     const state = canvasEditorRef.value.exportState();
@@ -237,6 +244,11 @@ watch(selectedObject, (newVal) => {
       @add-rect="handleAddRect"
       @add-circle="handleAddCircle"
       @add-battery="handleAddBattery"
+      @add-weather-temp="handleAddWeatherTemp"
+      @add-weather-humidity="handleAddWeatherHumidity"
+      @add-weather-wind="handleAddWeatherWind"
+      @add-weather-precip="handleAddWeatherPrecip"
+      @add-weather-icon="handleAddWeatherIcon"
     />
 
     <!-- Center: Workspace -->

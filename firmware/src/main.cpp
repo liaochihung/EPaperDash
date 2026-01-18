@@ -86,13 +86,16 @@ void loop() {
         }
     }
     
-    // 3. Clock Update (Minute trigger)
-    static int lastMinute = -1;
-    int currentMinute = timeClient.getMinutes();
+    // 3. Display Update (Configurable Interval)
+    static unsigned long lastRefreshTime = 0;
+    unsigned long refreshIntervalMs = (unsigned long)appConfig.refresh_interval_sec * 1000;
     
-    if (wifiController.isConnected() && currentMinute != lastMinute && displayController.getWidgetCount() > 0) {
-        lastMinute = currentMinute;
-        Serial.println("Time changed, updating overlay...");
+    if (wifiController.isConnected() && 
+        (millis() - lastRefreshTime > refreshIntervalMs) && 
+        displayController.getWidgetCount() > 0) {
+        
+        lastRefreshTime = millis();
+        Serial.printf("Refresh interval reached (%d sec), updating display...\n", appConfig.refresh_interval_sec);
         
         String timeStr = timeClient.getFormattedTime().substring(0, 5);
         
@@ -147,6 +150,7 @@ void processSerialCommands() {
             if (doc["lon"].is<float>()) appConfig.lon = doc["lon"];
             if (doc["tz"].is<String>()) appConfig.timezone = doc["tz"].as<String>();
             if (doc["tz_off"].is<long>()) appConfig.timezone_offset_sec = doc["tz_off"];
+            if (doc["refresh"].is<int>()) appConfig.refresh_interval_sec = doc["refresh"];
             
             configManager.save(appConfig);
             Serial.println("{\"result\": \"config_saved\"}");
@@ -161,6 +165,7 @@ void processSerialCommands() {
             resp["lat"] = appConfig.lat;
             resp["lon"] = appConfig.lon;
             resp["tz"] = appConfig.timezone;
+            resp["refresh"] = appConfig.refresh_interval_sec;
             serializeJson(resp, Serial);
             Serial.println();
         }

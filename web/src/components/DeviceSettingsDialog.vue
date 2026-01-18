@@ -17,6 +17,7 @@ const lat = ref(0.0);
 const lon = ref(0.0);
 const timezone = ref('UTC');
 const tzOffset = ref(0);
+const refreshInterval = ref(5);  // Default 5 minutes
 
 onMounted(() => {
     // Load from LocalStorage if available
@@ -30,6 +31,7 @@ onMounted(() => {
             lon.value = conf.lon || 0.0;
             timezone.value = conf.tz || 'UTC';
             tzOffset.value = conf.tz_off ? conf.tz_off / 3600 : 0;
+            refreshInterval.value = conf.refresh ? conf.refresh / 60 : 5;
         } catch (e) { console.error(e); }
     }
 });
@@ -47,7 +49,8 @@ const saveConfig = () => {
         lat: lat.value,
         lon: lon.value,
         tz: timezone.value,
-        tz_off: tzOffset.value * 3600
+        tz_off: tzOffset.value * 3600,
+        refresh: refreshInterval.value * 60  // Convert to seconds
     };
     
     // Persist locally
@@ -167,6 +170,12 @@ defineExpose({
              <label class="block text-sm font-medium">Timezone Offset (Hours)</label>
              <input v-model="tzOffset" type="number" class="w-full border rounded p-2" placeholder="e.g. 8 for UTC+8">
              <p class="text-xs text-gray-500 mt-1">Example: 8 for China/Singapore, -5 for New York.</p>
+        </div>
+        
+        <div class="pt-4 border-t">
+             <label class="block text-sm font-medium">Display Refresh Interval (Minutes)</label>
+             <input v-model="refreshInterval" type="number" min="1" max="60" class="w-full border rounded p-2" placeholder="5">
+             <p class="text-xs text-gray-500 mt-1">How often to update the e-paper display. Recommended: 5-10 minutes.</p>
         </div>
       </div>
 

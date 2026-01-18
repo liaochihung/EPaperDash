@@ -60,11 +60,18 @@ void DisplayController::setImageValid(bool valid) {
 }
 
 void DisplayController::drawBackground() {
+    // Debug: Check image buffer state
+    Serial.printf("[DEBUG] drawBackground: imageBuffer=%p, hasValidImage=%d\n", imageBuffer, hasValidImage);
+    
     // Only draw background if we have a valid uploaded image
     if (imageBuffer && hasValidImage) {
         uint32_t planeSize = (uint32_t)IMG_WIDTH * IMG_HEIGHT / 8;
         uint8_t* blackBitmap = imageBuffer;
         uint8_t* redBitmap = imageBuffer + planeSize;
+        
+        // Debug: Check first few bytes of bitmap
+        Serial.printf("[DEBUG] Black bitmap first 4 bytes: %02X %02X %02X %02X\n", 
+            blackBitmap[0], blackBitmap[1], blackBitmap[2], blackBitmap[3]);
         
         Serial.println("Drawing background image...");
         
@@ -73,6 +80,7 @@ void DisplayController::drawBackground() {
         display.drawBitmap(0, 0, blackBitmap, IMG_WIDTH, IMG_HEIGHT, GxEPD_BLACK);
         display.drawBitmap(0, 0, redBitmap, IMG_WIDTH, IMG_HEIGHT, GxEPD_RED);
     } else {
+        Serial.println("[DEBUG] No valid image to draw");
         // No valid image, just keep white background
         // (fillScreen already called before this)
     }
@@ -81,8 +89,9 @@ void DisplayController::drawBackground() {
 void DisplayController::renderOverlay(bool partial, String timeStr, String dateStr, float temp, int weatherCode, float windSpeed, int humidity, int precipProb) {
     if (widgetCount == 0 && partial) return; 
 
-    // display.powerOn(); 
-    display.setFullWindow(); 
+    // Use setPartialWindow for faster refresh with less flicker
+    // Note: 3-color e-paper may show ghosting - can revert to setFullWindow() if needed
+    display.setPartialWindow(0, 0, IMG_WIDTH, IMG_HEIGHT);
     
     display.firstPage();
     do {
@@ -164,6 +173,63 @@ void DisplayController::renderOverlay(bool partial, String timeStr, String dateS
                     display.setCursor(w.x + 5, details_y);
                     display.print(details);
                 }
+            }
+            // Weather Sub-Components (Independent)
+            else if (w.type == "weather-temp") {
+                String tempS = String(temp, 1) + "C";
+                display.setFont(&FreeSansBold24pt7b);
+                display.getTextBounds(tempS, 0, 0, &tbx, &tby, &tbw, &tbh);
+                int16_t cursor_y = w.y - tby;
+                display.getTextBounds(tempS, w.x, cursor_y, &tbx, &tby, &tbw, &tbh);
+                display.fillRect(tbx-2, tby-2, tbw+4, tbh+4, GxEPD_WHITE);
+                display.setCursor(w.x, cursor_y);
+                display.print(tempS);
+            }
+            else if (w.type == "weather-humidity") {
+                String humS = String(humidity) + "%";
+                display.setFont(&FreeSansBold12pt7b);
+                display.getTextBounds(humS, 0, 0, &tbx, &tby, &tbw, &tbh);
+                int16_t cursor_y = w.y - tby;
+                display.getTextBounds(humS, w.x, cursor_y, &tbx, &tby, &tbw, &tbh);
+                display.fillRect(tbx-2, tby-2, tbw+4, tbh+4, GxEPD_WHITE);
+                display.setCursor(w.x, cursor_y);
+                display.print(humS);
+            }
+            else if (w.type == "weather-wind") {
+                String windS = String(windSpeed, 0) + "km/h";
+                display.setFont(&FreeSansBold12pt7b);
+                display.getTextBounds(windS, 0, 0, &tbx, &tby, &tbw, &tbh);
+                int16_t cursor_y = w.y - tby;
+                display.getTextBounds(windS, w.x, cursor_y, &tbx, &tby, &tbw, &tbh);
+                display.fillRect(tbx-2, tby-2, tbw+4, tbh+4, GxEPD_WHITE);
+                display.setCursor(w.x, cursor_y);
+                display.print(windS);
+            }
+            else if (w.type == "weather-precip") {
+                String precipS = String(precipProb) + "%";
+                display.setFont(&FreeSansBold12pt7b);
+                display.getTextBounds(precipS, 0, 0, &tbx, &tby, &tbw, &tbh);
+                int16_t cursor_y = w.y - tby;
+                display.getTextBounds(precipS, w.x, cursor_y, &tbx, &tby, &tbw, &tbh);
+                display.fillRect(tbx-2, tby-2, tbw+4, tbh+4, GxEPD_WHITE);
+                display.setCursor(w.x, cursor_y);
+                display.print(precipS);
+            }
+            else if (w.type == "weather-icon") {
+                String icon = "?";
+                if (weatherCode == 0) icon = "O";  // Clear sky
+                else if (weatherCode <= 3) icon = "~";  // Partly cloudy
+                else if (weatherCode <= 67) icon = "=";  // Rain
+                else if (weatherCode <= 77) icon = "*";  // Snow
+                else icon = "!";  // Thunderstorm
+                
+                display.setFont(&FreeSansBold24pt7b);
+                display.getTextBounds(icon, 0, 0, &tbx, &tby, &tbw, &tbh);
+                int16_t cursor_y = w.y - tby;
+                display.getTextBounds(icon, w.x, cursor_y, &tbx, &tby, &tbw, &tbh);
+                display.fillRect(tbx-2, tby-2, tbw+4, tbh+4, GxEPD_WHITE);
+                display.setCursor(w.x, cursor_y);
+                display.print(icon);
             }
         }
     } while (display.nextPage());
