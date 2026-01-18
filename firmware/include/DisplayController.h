@@ -33,6 +33,7 @@ public:
     // Buffer Access
     uint8_t* getBuffer();
     bool allocateBuffer();
+    void setImageValid(bool valid);  // Mark image as valid after successful upload
     
     // Drawing
     void drawBackground();

@@ -238,6 +238,9 @@ void processBinaryProtocol() {
     if (headerReceived && bytesReceived == expectedPayloadSize) {
       Serial.println("Payload received. Rendering with Overlay...");
       
+      // Mark image as valid for rendering
+      displayController.setImageValid(true);
+      
       // Render
       // Get Time/Date/Weather for Overlay
       String timeStr = timeClient.getFormattedTime().substring(0, 5);
