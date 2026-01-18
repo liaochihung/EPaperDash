@@ -43,8 +43,8 @@ onLineReceived.value = (line) => {
         if (data.result === 'scan_complete' && data.networks) {
             settingsDialogRef.value?.updateWifiList(data.networks);
         }
-    } catch (e) {
-        // Ignore
+    } catch {
+        // Not JSON - expected for plain text serial output
     }
 };
 
@@ -59,7 +59,7 @@ sendBinary.sendJSON = sendJSON;
 const { isUploading, uploadToScreen } = useFirmwareUpload(sendBinary, isConnected);
 
 onMounted(() => {
-    globalThis.addEventListener('keydown', handleKeydown);
+    globalThis.addEventListener('keydown', handleKeyDown);
     const saved = localStorage.getItem('epaper_dash_layout');
     if (saved) {
         setTimeout(() => {

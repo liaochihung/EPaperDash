@@ -41,8 +41,10 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     const clearCanvas = () => {
         if (!paperGroup.value) return;
 
-        // Remove all children except the background
-        const children = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg');
+        // Remove all children except the background and selection rect
+        const children = paperGroup.value.getChildren((node) =>
+            node.id() !== 'paper-bg' && node.id() !== 'selection-rect'
+        );
         children.forEach(c => c.destroy());
 
         // Clear transformer selection
@@ -212,7 +214,10 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
         // 5. Selection Rectangle
         selectionRect.value = new Konva.Rect({
+            id: 'selection-rect', // ID to prevent deletion by clearCanvas
             fill: 'rgba(0, 161, 255, 0.3)',
+            stroke: 'rgba(0, 161, 255, 0.8)',
+            strokeWidth: 1,
             visible: false,
             listening: false, // Do not catch events
         });
@@ -290,8 +295,18 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         window.addEventListener('keyup', handleKeyUp);
 
 
+
+        // Flag to track if we just finished a drag selection
+        let justFinishedDragSelection = false;
+
         stage.value.on('click tap', (e) => {
             const target = e.target;
+
+            // If we just finished a drag selection, don't deselect
+            if (justFinishedDragSelection) {
+                justFinishedDragSelection = false;
+                return;
+            }
 
             // Deselect if clicked on stage or background
             if (target === stage.value || target.id() === 'paper-bg') {
@@ -341,6 +356,16 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             }
         });
 
+        // State to track the logical selection box during drag
+        let currentSelectionBox = null;
+
+        // Helper to get pointer position relative to paperGroup
+        const getLocalPointerPosition = () => {
+            const transform = paperGroup.value.getAbsoluteTransform().copy();
+            transform.invert();
+            return transform.point(stage.value.getPointerPosition());
+        };
+
         // Rubber Band Selection Logic
         stage.value.on('mousedown touchstart', (e) => {
             if (e.target !== stage.value && e.target.id() !== 'paper-bg') {
@@ -348,25 +373,44 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             }
 
             e.evt.preventDefault();
-            const pos = stage.value.getRelativePointerPosition();
+
+            // Get position relative to paperGroup (handles zoom/pan correctly)
+            const pos = getLocalPointerPosition();
             selectionStart.value = { x: pos.x, y: pos.y }; // Relative to stage content
 
-            selectionRect.value.width(0);
-            selectionRect.value.height(0);
+
+            currentSelectionBox = null;
+
+            // Set the initial position of the selection rectangle
+            selectionRect.value.setAttrs({
+                x: pos.x,
+                y: pos.y,
+                width: 0,
+                height: 0,
+            });
             selectionRect.value.visible(true);
             isSelecting.value = true;
+
+
+
+            layer.value.batchDraw();
         });
 
         stage.value.on('mousemove touchmove', (e) => {
             if (!isSelecting.value) return;
 
             e.evt.preventDefault();
-            const pos = stage.value.getRelativePointerPosition();
+
+            // Get position relative to paperGroup
+            const pos = getLocalPointerPosition();
 
             const x = Math.min(selectionStart.value.x, pos.x);
             const y = Math.min(selectionStart.value.y, pos.y);
             const w = Math.abs(pos.x - selectionStart.value.x);
             const h = Math.abs(pos.y - selectionStart.value.y);
+
+            currentSelectionBox = { x, y, width: w, height: h };
+            // console.log('Selection Move:', currentSelectionBox);
 
             selectionRect.value.setAttrs({
                 x: x,
@@ -380,17 +424,27 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         stage.value.on('mouseup touchend', (e) => {
             if (!isSelecting.value) return;
             isSelecting.value = false;
-
-            if (!selectionRect.value.visible()) return;
+            selectionRect.value.visible(false);
 
             e.evt.preventDefault();
 
-            // Use the engine's absolute bounding box calculation
-            // We must capture it while the node is visible
-            const box = selectionRect.value.getClientRect();
+            // Use the last calculated box from mousemove, or calculate if single click/immediate up
+            let box = currentSelectionBox;
 
-            // Hide the visual rect immediately after
-            selectionRect.value.visible(false);
+            if (!box) {
+                // Fallback if no move happened (e.g. click)
+                const pos = getLocalPointerPosition();
+                const sx = selectionStart.value.x;
+                const sy = selectionStart.value.y;
+                box = {
+                    x: Math.min(sx, pos.x),
+                    y: Math.min(sy, pos.y),
+                    width: Math.abs(pos.x - sx),
+                    height: Math.abs(pos.y - sy)
+                };
+            }
+
+
 
             // Find intersecting nodes
             const children = paperGroup.value.getChildren();
@@ -400,9 +454,33 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                 if (node === selectionRect.value) return false;
                 if (!node.visible()) return false;
 
-                // Intersection check using absolute boxes
-                return Konva.Util.haveIntersection(box, node.getClientRect());
+                // Get node bounding box using local coordinates
+                // This is more reliable than getClientRect with relativeTo for intersection
+                const nodeBox = {
+                    x: node.x(),
+                    y: node.y(),
+                    width: node.width() * (node.scaleX() || 1),
+                    height: node.height() * (node.scaleY() || 1)
+                };
+
+                // Check if nodeBox is fully contained within the selection box
+                const isContained =
+                    nodeBox.x >= box.x &&
+                    nodeBox.y >= box.y &&
+                    (nodeBox.x + nodeBox.width) <= (box.x + box.width) &&
+                    (nodeBox.y + nodeBox.height) <= (box.y + box.height);
+
+
+
+                return isContained;
             });
+
+
+
+            // Mark that we finished a drag selection (only if we actually dragged)
+            if (box.width > 5 || box.height > 5) {
+                justFinishedDragSelection = true;
+            }
 
             transformer.value.nodes(selected);
             if (selected.length > 0) {
@@ -413,7 +491,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                 emit('selected', null);
             }
 
-            // Force redraw to clear the selection rect artifacts
+            // Force redraw
             layer.value.batchDraw();
         });
 
@@ -735,7 +813,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         if (!paperGroup.value) return null;
 
         // Custom serialization to handle nested children in groups
-        const nodes = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg').map(node => {
+        const nodes = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg' && node.id() !== 'selection-rect').map(node => {
             const data = {
                 className: node.className,
                 attrs: node.getAttrs(),
@@ -759,8 +837,10 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         if (!json || !paperGroup.value) return;
         try {
             const data = JSON.parse(json);
-            // Clear existing
-            const children = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg');
+            // Clear existing (except background and selection rect)
+            const children = paperGroup.value.getChildren((node) =>
+                node.id() !== 'paper-bg' && node.id() !== 'selection-rect'
+            );
             children.forEach(c => c.destroy());
             transformer.value.nodes([]); // Clear selection
 
