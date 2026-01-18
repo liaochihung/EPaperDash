@@ -27,7 +27,7 @@ class DisplayController {
 public:
     void begin();
     void setLayout(const JsonArray& widgets);
-    void renderOverlay(bool partial, String timeStr, String dateStr, float temp, int weatherCode);
+    void renderOverlay(bool partial, String timeStr, String dateStr, float temp, int weatherCode, float windSpeed, int humidity, int precipProb);
     int getWidgetCount() const;
     
     // Buffer Access

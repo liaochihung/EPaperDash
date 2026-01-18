@@ -104,7 +104,7 @@ void loop() {
         strftime(buffer, 80, "%a, %b %d", ti);
         String dateStr = String(buffer);
         
-        displayController.renderOverlay(true, timeStr, dateStr, weatherService.getTemp(), weatherService.getWeatherCode());
+        displayController.renderOverlay(true, timeStr, dateStr, weatherService.getTemp(), weatherService.getWeatherCode(), weatherService.getWindSpeed(), weatherService.getHumidity(), weatherService.getPrecipitationProb());
     }
     
     // 4. Timeout Reset
@@ -250,7 +250,7 @@ void processBinaryProtocol() {
       strftime(buffer, 80, "%a, %b %d", ti);
       String dateStr = String(buffer);
       
-      displayController.renderOverlay(false, timeStr, dateStr, weatherService.getTemp(), weatherService.getWeatherCode());
+      displayController.renderOverlay(false, timeStr, dateStr, weatherService.getTemp(), weatherService.getWeatherCode(), weatherService.getWindSpeed(), weatherService.getHumidity(), weatherService.getPrecipitationProb());
 
       Serial.println("Drawing Complete.");
       

@@ -13,7 +13,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['selected', 'change']);
+const emit = defineEmits(['selected', 'change', 'history-change']);
 
 const stageContainer = ref(null);
 let resizeObserver = null;
@@ -41,6 +41,11 @@ const {
     addRect,
     addCircle,
     addBatteryNode,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    selectAll,
     stage // access ref if needed for cleanup
 } = useKonvaCanvas(stageContainer, props, emit);
 
@@ -67,6 +72,11 @@ watch(() => [props.width, props.height], ([newW, newH]) => {
     updatePaperSize(newW, newH);
 });
 
+// Watch History State
+watch([canUndo, canRedo], ([undoState, redoState]) => {
+    emit('history-change', { canUndo: undoState, canRedo: redoState });
+});
+
 // Expose methods to parent
 defineExpose({
     addText,
@@ -83,7 +93,15 @@ defineExpose({
     addTimeNode,
     addWeatherNode,
     addDateNode,
-    getPartialDataURL
+    getPartialDataURL,
+    undo,
+    redo,
+    addRect,
+    addCircle,
+    addBatteryNode,
+    canUndo,
+    canRedo,
+    selectAll
 });
 
 const handleDrop = (e) => {

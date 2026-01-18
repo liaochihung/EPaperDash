@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import Konva from 'konva';
+import { useHistory } from './useHistory';
 
 export function useKonvaCanvas(stageContainer, props, emit) {
     const stage = ref(null);
@@ -9,6 +10,53 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     const selectedId = ref(null);
     const gridLayer = ref(null);
     const showGrid = ref(false);
+
+    // Selection state
+    const selectionRect = ref(null);
+    const isSelecting = ref(false);
+    const selectionStart = ref({ x: 0, y: 0 });
+
+    // History
+    // History Management
+    const {
+        history,
+        pushState,
+        undo: historyUndo,
+        redo: historyRedo,
+        reset: resetHistory,
+        canUndo,
+        canRedo
+    } = useHistory();
+
+    const saveHistory = () => {
+        if (!paperGroup.value) return;
+        const state = exportState();
+        pushState(state);
+    };
+
+    const undo = () => {
+        const prevState = historyUndo();
+        if (prevState) {
+            // Clear selection to avoid issues
+            transformer.value.nodes([]);
+            selectedId.value = null;
+            emit('selected', null);
+
+            importState(prevState, false);
+        }
+    };
+
+    const redo = () => {
+        const nextState = historyRedo();
+        if (nextState) {
+            // Clear selection
+            transformer.value.nodes([]);
+            selectedId.value = null;
+            emit('selected', null);
+
+            importState(nextState, false);
+        }
+    };
 
     const initStage = () => {
         if (!stageContainer.value) return;
@@ -64,14 +112,25 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             anchorSize: 10,
             borderStroke: '#3b82f6',
             borderDash: [4, 4],
-            keepRatio: true,
+            keepRatio: false, // Allow non-uniform scaling (width/height independent)
             rotateEnabled: true,
-            enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+            enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'middle-left', 'middle-right']
         });
         layer.value.add(transformer.value);
 
-        // 5. Events
+        // 5. Selection Rectangle
+        selectionRect.value = new Konva.Rect({
+            fill: 'rgba(0, 161, 255, 0.3)',
+            visible: false,
+            listening: false, // Do not catch events
+        });
+        layer.value.add(selectionRect.value);
+
+        // 6. Events
         setupEvents();
+
+        // Initial history save
+        saveHistory();
     };
 
     const setupEvents = () => {
@@ -91,10 +150,106 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             // Ignore transformer clicks
             if (target.getParent().className === 'Transformer') return;
 
-            // Select node
-            transformer.value.nodes([target]);
-            selectedId.value = target.id();
-            emitNodeProperties(target);
+            // Handle Group Selection (if clicked element is inside a group like Weather)
+            let nodeToSelect = target;
+            if (target.getParent() && target.getParent().name() && target.getParent().name().includes('editable-group')) {
+                nodeToSelect = target.getParent();
+            }
+
+            // Handle multi-selection with Shift/Ctrl key
+            const isMulti = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+            const currentNodes = transformer.value.nodes();
+
+            if (isMulti) {
+                // If already selected, remove it
+                if (currentNodes.includes(nodeToSelect)) {
+                    const newNodes = currentNodes.filter(n => n !== nodeToSelect);
+                    transformer.value.nodes(newNodes);
+                    if (newNodes.length > 0) {
+                        selectedId.value = newNodes[newNodes.length - 1].id();
+                        emitNodeProperties(newNodes[newNodes.length - 1]);
+                    } else {
+                        selectedId.value = null;
+                        emit('selected', null);
+                    }
+                } else {
+                    // Add to selection
+                    const newNodes = [...currentNodes, nodeToSelect];
+                    transformer.value.nodes(newNodes);
+                    selectedId.value = nodeToSelect.id();
+                    emitNodeProperties(nodeToSelect); // Emit the latest selected
+                }
+            } else {
+                // Single select
+                transformer.value.nodes([nodeToSelect]);
+                selectedId.value = nodeToSelect.id();
+                emitNodeProperties(nodeToSelect);
+            }
+        });
+
+        // Rubber Band Selection Logic
+        stage.value.on('mousedown touchstart', (e) => {
+            if (e.target !== stage.value && e.target.id() !== 'paper-bg') {
+                return;
+            }
+
+            e.evt.preventDefault();
+            const pos = stage.value.getPointerPosition();
+            selectionStart.value = { x: pos.x, y: pos.y }; // Relative to stage
+
+            selectionRect.value.width(0);
+            selectionRect.value.height(0);
+            selectionRect.value.visible(true);
+            isSelecting.value = true;
+        });
+
+        stage.value.on('mousemove touchmove', (e) => {
+            if (!isSelecting.value) return;
+
+            e.evt.preventDefault();
+            const pos = stage.value.getPointerPosition();
+
+            selectionRect.value.setAttrs({
+                x: Math.min(selectionStart.value.x, pos.x),
+                y: Math.min(selectionStart.value.y, pos.y),
+                width: Math.abs(pos.x - selectionStart.value.x),
+                height: Math.abs(pos.y - selectionStart.value.y),
+            });
+        });
+
+        stage.value.on('mouseup touchend', (e) => {
+            if (!isSelecting.value) return;
+
+            isSelecting.value = false;
+
+            if (!selectionRect.value.visible()) return;
+
+            e.evt.preventDefault();
+            selectionRect.value.visible(false);
+
+            const sr = selectionRect.value.getClientRect();
+
+            // Find intersecting nodes
+            const children = paperGroup.value.getChildren();
+            const selected = children.filter(node => {
+                if (node.id() === 'paper-bg') return false;
+
+                // Use client rect for intersection
+                // The selection rect is in stage coords (absolute)
+                // The node is in group coords, but getClientRect returns absolute
+                const nr = node.getClientRect();
+
+                return Konva.Util.haveIntersection(sr, nr);
+            });
+
+            transformer.value.nodes(selected);
+            if (selected.length > 0) {
+                // Maybe communicate specific selection info if needed
+                selectedId.value = selected[0].id();
+            } else {
+                selectedId.value = null;
+                emit('selected', null);
+            }
         });
 
         // Snap to grid on drag
@@ -111,12 +266,46 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             target.position({ x, y });
         });
 
+        stage.value.on('dragend', () => {
+            saveHistory();
+            if (selectedId.value) {
+                const node = paperGroup.value.findOne('#' + selectedId.value);
+                if (node) emitNodeProperties(node);
+            }
+            emit('change');
+        });
+
         // Update properties on transform/drag end
-        stage.value.on('transformend dragend', (e) => {
-            if (selectedId.value === e.target.id()) {
-                emitNodeProperties(e.target);
+        stage.value.on('transformend', (e) => {
+            const node = e.target;
+
+            // Normalize scale to width/height
+            if (node.scaleX() !== 1 || node.scaleY() !== 1) {
+                const scaleX = node.scaleX();
+                const scaleY = node.scaleY();
+
+                // For Text nodes, scaling affects fontSize, not width/height usually
+                if (node.className === 'Text') {
+                    // Logic remains: scale affects font size effectively, but good to normalize if possible
+                    // But for simplicity in Konva, often keeping scale is easier for Text
+                    // If we want exact width control:
+                    // node.fontSize(node.fontSize() * scaleX);
+                    // node.width(node.width() * scaleX);
+                    // node.scaleX(1); node.scaleY(1);
+                    // Let's keep Text scaling as is for now, or just normalize
+                } else {
+                    node.width(node.width() * scaleX);
+                    node.height(node.height() * scaleY);
+                    node.scaleX(1);
+                    node.scaleY(1);
+                }
+            }
+
+            if (selectedId.value === node.id()) {
+                emitNodeProperties(node);
                 emit('change');
             }
+            saveHistory();
         });
     };
 
@@ -124,17 +313,30 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         const nodeProps = {
             id: node.id(),
             type: node.className,
+            nodeType: node.getAttr('nodeType') || 'basic',
             x: Math.round(node.x()),
             y: Math.round(node.y()),
-            width: Math.round(node.width() * node.scaleX()),
-            height: Math.round(node.height() * node.scaleY()),
-            rotation: Math.round(node.rotation())
+            width: Math.round(node.width() * (node.scaleX() || 1)),
+            height: Math.round(node.height() * (node.scaleY() || 1)),
+            rotation: Math.round(node.rotation()),
+            draggable: node.draggable()
         };
 
         if (node.className === 'Text') {
             nodeProps.text = node.text();
             nodeProps.fontSize = Math.round(node.fontSize() * node.scaleX());
             nodeProps.fill = node.fill();
+        }
+
+        // Custom Props for Weather Grouo
+        if (node.getAttr('nodeType') === 'weather') {
+            const icon = node.findOne('.weather-icon');
+            const temp = node.findOne('.weather-temp');
+            const details = node.findOne('.weather-details');
+
+            if (icon) nodeProps.weatherIcon = icon.text();
+            if (temp) nodeProps.weatherTemp = temp.text();
+            if (details) nodeProps.weatherDetails = details.text();
         }
 
         emit('selected', nodeProps);
@@ -186,6 +388,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        saveHistory();
         emit('change');
     };
 
@@ -204,11 +407,24 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             setupCursorEvents(img);
             paperGroup.value.add(img);
             selectNode(img);
+            saveHistory();
             emit('change');
         });
     };
 
     const deleteSelected = () => {
+        const nodes = transformer.value.nodes();
+        if (nodes.length > 0) {
+            nodes.forEach(n => n.destroy());
+            transformer.value.nodes([]);
+            selectedId.value = null;
+            emit('selected', null);
+            layer.value.batchDraw();
+            saveHistory();
+            emit('change');
+            return;
+        }
+
         if (!selectedId.value || !paperGroup.value) return;
         const node = paperGroup.value.findOne('#' + selectedId.value);
         if (node) {
@@ -217,6 +433,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             selectedId.value = null;
             emit('selected', null);
             layer.value.batchDraw();
+            saveHistory();
             emit('change');
         }
     };
@@ -225,10 +442,40 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         if (!paperGroup.value) return;
         const node = paperGroup.value.findOne('#' + id);
         if (node) {
+            // Handle specialized Weather updates
+            if (node.getAttr('nodeType') === 'weather') {
+                if (attrs.weatherIcon !== undefined) {
+                    node.findOne('.weather-icon')?.text(attrs.weatherIcon);
+                    delete attrs.weatherIcon;
+                }
+                if (attrs.weatherTemp !== undefined) {
+                    node.findOne('.weather-temp')?.text(attrs.weatherTemp);
+                    delete attrs.weatherTemp;
+                }
+                if (attrs.weatherDetails !== undefined) {
+                    node.findOne('.weather-details')?.text(attrs.weatherDetails);
+                    delete attrs.weatherDetails;
+                }
+            }
+
+            // Normal attribute updates
             if (attrs.x !== undefined) attrs.x = Math.round(attrs.x);
             if (attrs.y !== undefined) attrs.y = Math.round(attrs.y);
+
+            // Handle explicit Width/Height changes from props panel
+            // Reset scale if width/height are manually set to avoid confusion
+            if (attrs.width !== undefined || attrs.height !== undefined) {
+                node.scaleX(1);
+                node.scaleY(1);
+            }
+
             node.setAttrs(attrs);
             layer.value.batchDraw();
+            node.setAttrs(attrs);
+            layer.value.batchDraw();
+
+            // Save history for property changes (important for Undo to work on props)
+            saveHistory();
             emit('change');
         }
     };
@@ -248,7 +495,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             const children = paperGroup.value.getChildren();
             children.forEach(node => {
                 const type = node.getAttr('nodeType');
-                if (['time', 'date', 'weather'].includes(type)) {
+                if (['time', 'date', 'weather'].includes(type) || node.name()?.includes('dynamic')) {
                     if (node.visible()) {
                         node.hide();
                         hiddenNodes.push(node);
@@ -282,15 +529,29 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
     const exportState = () => {
         if (!paperGroup.value) return null;
-        const children = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg');
-        const data = children.map(node => ({
-            className: node.className,
-            attrs: node.getAttrs()
-        }));
-        return JSON.stringify(data);
+
+        // Custom serialization to handle nested children in groups
+        const nodes = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg').map(node => {
+            const data = {
+                className: node.className,
+                attrs: node.getAttrs(),
+                children: [] // for groups
+            };
+
+            if (node.className === 'Group') {
+                data.children = node.getChildren().map(child => ({
+                    className: child.className,
+                    attrs: child.getAttrs()
+                }));
+            }
+
+            return data;
+        });
+
+        return JSON.stringify(nodes);
     };
 
-    const importState = (json) => {
+    const importState = (json, saveToHistory = true) => {
         if (!json || !paperGroup.value) return;
         try {
             const data = JSON.parse(json);
@@ -300,51 +561,57 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             transformer.value.nodes([]); // Clear selection
 
             data.forEach(item => {
-                // Ensure draggable is preserved or defaulted to true
-                if (item.attrs) {
-                    item.attrs.draggable = true;
-                }
+                let node;
 
-                if (item.attrs) {
-                    item.attrs.draggable = true;
-                }
+                // Helper to create basic shapes
+                const createShape = (def) => {
+                    if (def.className === 'Rect') return new Konva.Rect(def.attrs);
+                    if (def.className === 'Circle') return new Konva.Circle(def.attrs);
+                    if (def.className === 'Text') {
+                        const t = new Konva.Text(def.attrs);
+                        // Re-add custom hitFunc for better text selection
+                        t.hitFunc(function (context) {
+                            context.beginPath();
+                            context.rect(0, 0, this.width(), this.height());
+                            context.closePath();
+                            context.fillStrokeShape(this);
+                        });
+                        return t;
+                    }
+                    if (def.className === 'Image') {
+                        const img = new Konva.Image(def.attrs);
+                        if (def.attrs.imageSrc) {
+                            Konva.Image.fromURL(def.attrs.imageSrc, (loadedImg) => {
+                                img.image(loadedImg.image());
+                                layer.value.batchDraw();
+                            });
+                        }
+                        return img;
+                    }
+                    return null;
+                };
 
-                if (['Rect', 'Circle'].includes(item.className) && item.id !== 'paper-bg') {
-                    // Generic shape handling
-                    let node;
-                    if (item.className === 'Rect') node = new Konva.Rect(item.attrs);
-                    if (item.className === 'Circle') node = new Konva.Circle(item.attrs);
-
-                    setupCursorEvents(node);
-                    paperGroup.value.add(node);
-                } else if (item.className === 'Text') {
-                    const node = new Konva.Text(item.attrs);
-                    // Re-add custom hitFunc
-                    node.hitFunc(function (context) {
-                        context.beginPath();
-                        context.rect(0, 0, this.width(), this.height());
-                        context.closePath();
-                        context.fillStrokeShape(this);
-                    });
-                    setupCursorEvents(node);
-                    paperGroup.value.add(node);
-                } else if (item.className === 'Image') {
-                    const src = item.attrs.imageSrc || item.attrs.url;
-                    if (src) {
-                        Konva.Image.fromURL(src, (img) => {
-                            // Clean attrs to prevent overwriting the image object with invalid data from JSON
-                            const cleanAttrs = { ...item.attrs };
-                            delete cleanAttrs.image;
-
-                            img.setAttrs(cleanAttrs);
-                            setupCursorEvents(img);
-                            paperGroup.value.add(img);
-                            layer.value.batchDraw();
+                if (item.className === 'Group') {
+                    node = new Konva.Group(item.attrs);
+                    if (item.children) {
+                        item.children.forEach(childDef => {
+                            const childNode = createShape(childDef);
+                            if (childNode) node.add(childNode);
                         });
                     }
+                } else {
+                    node = createShape(item);
+                }
+
+                if (node) {
+                    setupCursorEvents(node);
+                    paperGroup.value.add(node);
                 }
             });
+
             layer.value.batchDraw();
+            if (saveToHistory) saveHistory();
+            emit('change');
         } catch (e) {
             console.error("Failed to load state", e);
         }
@@ -372,6 +639,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             paperGroup.value.width(newW);
             paperGroup.value.height(newH);
             recenterPaper();
+            saveHistory();
         }
     };
 
@@ -422,6 +690,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         if (node && node.id() !== 'paper-bg') {
             node.moveToTop();
             layer.value.batchDraw();
+            saveHistory();
             emit('change');
         }
     };
@@ -434,6 +703,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             const bg = paperGroup.value.findOne('#paper-bg');
             if (bg) bg.moveToBottom();
             layer.value.batchDraw();
+            saveHistory();
             emit('change');
         }
     };
@@ -444,15 +714,24 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         const node = paperGroup.value.findOne('#' + selectedId.value);
         if (!node || node.id() === 'paper-bg') return;
 
+        // Clone logic needs recursive clone for groups
         const clone = node.clone({
             id: `${node.className.toLowerCase()}-${Date.now()}`,
             x: node.x() + 20,
             y: node.y() + 20
         });
 
+        // Setup events for clone (and its children if group)
+        if (clone.className === 'Group') {
+            clone.getChildren().forEach(child => {
+                // Konva clone already handles children but we might want to ensure properties 
+            });
+        }
+
         setupCursorEvents(clone);
         paperGroup.value.add(clone);
         selectNode(clone);
+        saveHistory();
         emit('change');
     };
 
@@ -484,33 +763,79 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        saveHistory();
         emit('change');
     };
 
+    // Advanced Weather Node (Group)
     const addWeatherNode = () => {
         if (!paperGroup.value) return;
-        const text = new Konva.Text({
+
+        const group = new Konva.Group({
             x: 50,
-            y: 150,
-            text: '☀️ 72°F',
-            fontSize: 36,
-            fontFamily: 'sans-serif',
-            fill: 'black',
+            y: 50,
+            width: 200,
+            height: 120,
             draggable: true,
             id: `weather-${Date.now()}`,
-            name: 'editable-text',
-            nodeType: 'weather', // Custom metadata
-            hitFunc: function (context) {
-                context.beginPath();
-                context.rect(0, 0, this.width(), this.height());
-                context.closePath();
-                context.fillStrokeShape(this);
-            }
+            name: 'editable-group',
+            nodeType: 'weather'
         });
 
-        setupCursorEvents(text);
-        paperGroup.value.add(text);
-        selectNode(text);
+        // 1. Transparent Background for easier selection
+        const bg = new Konva.Rect({
+            width: 200,
+            height: 120,
+            fill: 'transparent',
+            stroke: '#eee', // Light border while editing
+            strokeWidth: 1,
+            dash: [4, 4],
+            name: 'group-bg'
+        });
+
+        // 2. Weather Icon
+        const icon = new Konva.Text({
+            x: 10,
+            y: 10,
+            text: '⛅',
+            fontSize: 60,
+            fontFamily: 'sans-serif',
+            fill: 'black',
+            name: 'weather-icon'
+        });
+
+        // 3. Temperature
+        const temp = new Konva.Text({
+            x: 80,
+            y: 20,
+            text: '24°C',
+            fontSize: 40,
+            fontFamily: 'sans-serif',
+            fill: 'black',
+            name: 'weather-temp'
+        });
+
+        // 4. Details
+        const details = new Konva.Text({
+            x: 10,
+            y: 80,
+            text: 'AQI: 45 | 💧 20% | 🍃 5km/h',
+            fontSize: 16,
+            fontFamily: 'sans-serif',
+            fill: '#666',
+            name: 'weather-details',
+            width: 180
+        });
+
+        group.add(bg);
+        group.add(icon);
+        group.add(temp);
+        group.add(details);
+
+        setupCursorEvents(group);
+        paperGroup.value.add(group);
+        selectNode(group);
+        saveHistory();
         emit('change');
     };
 
@@ -541,6 +866,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        saveHistory();
         emit('change');
     };
 
@@ -561,6 +887,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(rect);
         paperGroup.value.add(rect);
         selectNode(rect);
+        saveHistory();
         emit('change');
     };
 
@@ -580,6 +907,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(circle);
         paperGroup.value.add(circle);
         selectNode(circle);
+        saveHistory();
         emit('change');
     };
 
@@ -638,6 +966,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(group);
         paperGroup.value.add(group);
         selectNode(group);
+        saveHistory();
         emit('change');
     };
 
@@ -666,6 +995,18 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         return dataURL;
     };
 
+    const selectAll = () => {
+        if (!paperGroup.value) return;
+        const children = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg');
+        if (children.length > 0) {
+            transformer.value.nodes(children);
+            selectedId.value = children[0].id();
+            // Emit properties of the first selected node or specialized "multi"
+            emitNodeProperties(children[0]);
+            emit('selected', children[0].id());
+        }
+    };
+
     return {
         stage,
         initStage,
@@ -685,10 +1026,16 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         addTimeNode,
         addWeatherNode,
         addDateNode,
-        addDateNode,
         getPartialDataURL,
         addRect,
         addCircle,
-        addBatteryNode
+        addBatteryNode,
+        undo,
+        redo,
+        saveHistory, // Expose for manual saves if needed
+        resetHistory, // Expose reset
+        canUndo,
+        canRedo,
+        selectAll
     };
 }

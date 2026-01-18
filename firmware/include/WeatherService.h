@@ -11,11 +11,17 @@ public:
     void update(float lat, float lon);
     float getTemp();
     int getWeatherCode();
+    float getWindSpeed();
+    int getHumidity();
+    int getPrecipitationProb();
     unsigned long getLastUpdate();
 
 private:
     float currentTemp;
     int currentWeatherCode;
+    float currentWindSpeed;
+    int currentHumidity;
+    int currentPrecipitationProb;
     unsigned long lastUpdate;
 };
 

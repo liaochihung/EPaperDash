@@ -78,7 +78,7 @@ void DisplayController::drawBackground() {
     }
 }
 
-void DisplayController::renderOverlay(bool partial, String timeStr, String dateStr, float temp, int weatherCode) {
+void DisplayController::renderOverlay(bool partial, String timeStr, String dateStr, float temp, int weatherCode, float windSpeed, int humidity, int precipProb) {
     if (widgetCount == 0 && partial) return; 
 
     // display.powerOn(); 
@@ -129,15 +129,40 @@ void DisplayController::renderOverlay(bool partial, String timeStr, String dateS
             }
             else if (w.type == "weather") {
                 if (weatherCode != -1) {
-                    String tempS = String(temp, 1) + " C";
+                    // Weather icon based on code (simplified mapping)
+                    String icon = "?";
+                    if (weatherCode == 0) icon = "O";  // Clear sky - using 'O' for sun
+                    else if (weatherCode <= 3) icon = "~";  // Partly cloudy
+                    else if (weatherCode <= 67) icon = "=";  // Rain
+                    else if (weatherCode <= 77) icon = "*";  // Snow
+                    else icon = "!";  // Thunderstorm
+                    
+                    // Temperature
+                    String tempS = String(temp, 1) + "C";
+                    
+                    // Details line
+                    String details = "W:" + String(windSpeed, 0) + " H:" + String(humidity) + "% R:" + String(precipProb) + "%";
+                    
+                    // Draw icon (large)
+                    display.setFont(&FreeSansBold24pt7b);
+                    display.getTextBounds(icon, 0, 0, &tbx, &tby, &tbw, &tbh);
+                    int16_t icon_y = w.y + 10 - tby;
+                    display.setCursor(w.x + 5, icon_y);
+                    display.print(icon);
+                    
+                    // Draw temperature (medium, next to icon)
                     display.setFont(&FreeSansBold18pt7b);
                     display.getTextBounds(tempS, 0, 0, &tbx, &tby, &tbw, &tbh);
-                    int16_t cursor_y = w.y - tby;
-                    
-                    display.getTextBounds(tempS, w.x, cursor_y, &tbx, &tby, &tbw, &tbh);
-                    display.fillRect(tbx-2, tby-2, tbw+4, tbh+4, GxEPD_WHITE);
-                    display.setCursor(w.x, cursor_y);
+                    int16_t temp_y = w.y + 15 - tby;
+                    display.setCursor(w.x + 60, temp_y);
                     display.print(tempS);
+                    
+                    // Draw details (small, below)
+                    display.setFont(&FreeSansBold12pt7b);
+                    display.getTextBounds(details, 0, 0, &tbx, &tby, &tbw, &tbh);
+                    int16_t details_y = w.y + 60 - tby;
+                    display.setCursor(w.x + 5, details_y);
+                    display.print(details);
                 }
             }
         }

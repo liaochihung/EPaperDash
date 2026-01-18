@@ -17,7 +17,9 @@ defineProps({
           
           <!-- Common Properties -->
           <div class="space-y-3">
-              <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Position</h3>
+              <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Layout</h3>
+              
+              <!-- Position X/Y -->
               <div class="grid grid-cols-2 gap-3">
                   <div>
                       <label for="prop-x" class="block text-xs text-gray-500 mb-1">X</label>
@@ -28,10 +30,53 @@ defineProps({
                       <input id="prop-y" v-model.number="selectedObject.y" type="number" step="1" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
                   </div>
               </div>
+
+              <!-- Size W/H (if applicable) -->
+              <!-- For Text, Width/Height might be auto-calculated often, but we can allow overrides or at least show them -->
+              <div class="grid grid-cols-2 gap-3">
+                  <div>
+                      <label for="prop-w" class="block text-xs text-gray-500 mb-1">Width</label>
+                      <input id="prop-w" v-model.number="selectedObject.width" type="number" step="1" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                  </div>
+                  <div>
+                      <label for="prop-h" class="block text-xs text-gray-500 mb-1">Height</label>
+                      <input id="prop-h" v-model.number="selectedObject.height" type="number" step="1" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                  </div>
+              </div>
+
+              <!-- Rotation -->
+              <div>
+                  <label for="prop-rotation" class="block text-xs text-gray-500 mb-1">Rotation (°)</label>
+                  <div class="flex items-center gap-2">
+                       <input id="prop-rotation" v-model.number="selectedObject.rotation" type="range" min="0" max="360" step="1" class="flex-1" />
+                       <input v-model.number="selectedObject.rotation" type="number" class="w-14 px-1 py-1 bg-gray-50 border border-gray-200 rounded text-sm text-center" />
+                  </div>
+              </div>
+          </div>
+
+          <!-- Weather Properties -->
+          <div v-if="selectedObject.nodeType === 'weather'" class="space-y-3 pt-3 border-t border-gray-100">
+               <h3 class="text-xs font-semibold text-blue-500 uppercase tracking-wider block">Weather Data</h3>
+               
+               <div>
+                  <label class="block text-xs text-gray-500 mb-1">Icon (Emoji)</label>
+                  <input v-model="selectedObject.weatherIcon" type="text" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" placeholder="e.g. ☀️" />
+               </div>
+
+               <div>
+                  <label class="block text-xs text-gray-500 mb-1">Temperature</label>
+                  <input v-model="selectedObject.weatherTemp" type="text" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors" placeholder="e.g. 25°C" />
+               </div>
+
+               <div>
+                  <label class="block text-xs text-gray-500 mb-1">Details (Wind/Humidity)</label>
+                  <textarea v-model="selectedObject.weatherDetails" rows="2" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none mb-1"></textarea>
+                  <div class="text-[10px] text-gray-400">Supports multiline text</div>
+               </div>
           </div>
 
           <!-- Text Properties -->
-          <div v-if="selectedObject.type === 'Text'" class="space-y-3">
+          <div v-if="selectedObject.type === 'Text'" class="space-y-3 pt-3 border-t border-gray-100">
               <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Typography</h3>
                <div>
                   <label for="prop-content" class="block text-xs text-gray-500 mb-1">Content</label>
@@ -59,7 +104,10 @@ defineProps({
           </div>
           
            <div class="pt-4 border-t border-gray-100">
-               <div class="text-xs text-gray-400">ID: {{ selectedObject.id }}</div>
+               <div class="flex flex-col gap-1">
+                   <div class="text-[10px] text-gray-400 font-mono">ID: {{ selectedObject.id }}</div>
+                   <div class="text-[10px] text-gray-400 font-mono">Type: {{ selectedObject.type }} / {{ selectedObject.nodeType }}</div>
+               </div>
            </div>
 
       </div>

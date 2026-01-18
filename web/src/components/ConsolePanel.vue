@@ -12,6 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'clear']);
 
 const logsContainerRef = ref(null);
+const copied = ref(false);
 
 watch(() => props.logs.length, () => {
     if (props.isOpen) {
@@ -32,6 +33,22 @@ const scrollToBottom = () => {
         }
     });
 };
+
+const copyLogs = async () => {
+    if (props.logs.length === 0) return;
+    
+    const text = props.logs.map(log => `[${log.time}] ${log.text}`).join('\n');
+    
+    try {
+        await navigator.clipboard.writeText(text);
+        copied.value = true;
+        setTimeout(() => {
+            copied.value = false;
+        }, 2000);
+    } catch (err) {
+        console.error('Failed to copy logs:', err);
+    }
+};
 </script>
 
 <template>
@@ -49,6 +66,25 @@ const scrollToBottom = () => {
         <span class="tracking-wider uppercase text-[10px]">Serial Monitor</span>
       </div>
       <div class="flex items-center gap-2">
+        <button 
+          @click="copyLogs" 
+          :disabled="logs.length === 0"
+          class="px-2 py-1 text-[10px] uppercase tracking-wider transition flex items-center gap-1.5"
+          :class="copied 
+            ? 'text-green-400 bg-green-500/20' 
+            : logs.length === 0 
+              ? 'text-gray-600 cursor-not-allowed' 
+              : 'text-gray-400 hover:text-white hover:bg-white/10 rounded'"
+        >
+          <svg v-if="!copied" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          {{ copied ? 'Copied!' : 'Copy' }}
+        </button>
         <button 
           @click="$emit('clear')" 
           class="px-2 py-1 text-[10px] uppercase tracking-wider text-gray-400 hover:text-white hover:bg-white/10 rounded transition"

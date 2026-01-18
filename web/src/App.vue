@@ -20,6 +20,8 @@ const { isConnected, connect, disconnect, sendBinary, sendJSON, onLineReceived }
 // Dialogs
 const isSettingsOpen = ref(false);
 const settingsDialogRef = ref(null);
+const canUndo = ref(false);
+const canRedo = ref(false);
 
 // Console
 const isConsoleOpen = ref(false);
@@ -94,9 +96,15 @@ const handleDelete = () => {
         canvasEditorRef.value?.deleteSelected();
     }
 };
+const handleUndo = () => canvasEditorRef.value?.undo();
+const handleRedo = () => canvasEditorRef.value?.redo();
 const handleAddTime = () => canvasEditorRef.value?.addTimeNode();
 const handleAddDate = () => canvasEditorRef.value?.addDateNode();
 const handleAddWeather = () => canvasEditorRef.value?.addWeatherNode();
+const handleAddRect = () => canvasEditorRef.value?.addRect();
+const handleAddCircle = () => canvasEditorRef.value?.addCircle();
+const handleAddBattery = () => canvasEditorRef.value?.addBatteryNode();
+const handleSelectAll = () => canvasEditorRef.value?.selectAll();
 
 const handleSaveProject = () => {
     if (!canvasEditorRef.value) return;
@@ -137,10 +145,32 @@ const handleLoadProject = () => {
 };
 
 const handleKeydown = (e) => {
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
     if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-            canvasEditorRef.value?.deleteSelected();
-        }
+        canvasEditorRef.value?.deleteSelected();
+    }
+    
+    // Undo/Redo
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+    }
+    
+    // Copy
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+         handleCopy();
+    }
+    
+    // Select All
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        handleSelectAll();
     }
 };
 
@@ -148,6 +178,10 @@ const handleCanvasChange = () => {
     if (canvasEditorRef.value) {
         const state = canvasEditorRef.value.exportState();
         if (state) localStorage.setItem('epaper_dash_layout', state);
+        
+        // Update history state
+        canUndo.value = canvasEditorRef.value.canUndo || false;
+        canRedo.value = canvasEditorRef.value.canRedo || false;
     }
 };
 
@@ -159,19 +193,29 @@ watch(selectedObject, (newVal) => {
     if (newVal && canvasEditorRef.value) {
         const updateAttrs = {
             x: Math.round(newVal.x),
-            y: Math.round(newVal.y)
+            y: Math.round(newVal.y),
+             // Allow width/height updates
+            width: Math.round(newVal.width),
+            height: Math.round(newVal.height),
+            rotation: Math.round(newVal.rotation)
         };
+        // Update specialized weather props
+        if (newVal.nodeType === 'weather') {
+             updateAttrs.weatherIcon = newVal.weatherIcon;
+             updateAttrs.weatherTemp = newVal.weatherTemp;
+             updateAttrs.weatherDetails = newVal.weatherDetails;
+        }
+
         if (newVal.type === 'Text') {
             updateAttrs.text = newVal.text;
             updateAttrs.fontSize = Math.round(newVal.fontSize);
             updateAttrs.fill = newVal.fill;
-            updateAttrs.scaleX = 1;
-            updateAttrs.scaleY = 1;
+            // Text width/height handles differently often, 
+            // but if we want to force it or if Konva Text handles it:
+            // Usually we don't force width/height on text unless it's wrappingWidth
+            // But let's pass it for now as our updateNode logic handles resetting scale.
         } else if (newVal.type === 'Image') {
-            updateAttrs.width = Math.round(newVal.width);
-            updateAttrs.height = Math.round(newVal.height);
-            updateAttrs.scaleX = 1;
-            updateAttrs.scaleY = 1;
+             // Image logic is same as generic now via updateNode normalization
         }
         canvasEditorRef.value.updateNode(newVal.id, updateAttrs);
         handleCanvasChange();
@@ -190,6 +234,9 @@ watch(selectedObject, (newVal) => {
       @add-time="handleAddTime"
       @add-date="handleAddDate"
       @add-weather="handleAddWeather"
+      @add-rect="handleAddRect"
+      @add-circle="handleAddCircle"
+      @add-battery="handleAddBattery"
     />
 
     <!-- Center: Workspace -->
@@ -240,6 +287,11 @@ watch(selectedObject, (newVal) => {
             @send-to-back="handleSendToBack"
             @copy="handleCopy"
             @delete="handleDelete"
+            @undo="handleUndo"
+            @redo="handleRedo"
+            @select-all="handleSelectAll"
+            :can-undo="canUndo"
+            :can-redo="canRedo"
           />
       </div>
       
@@ -249,7 +301,8 @@ watch(selectedObject, (newVal) => {
             ref="canvasEditorRef" 
             @selected="handleSelected" 
             @change="handleCanvasChange"
-            :width="selectedDisplay.width" 
+            @history-change="(state) => { canUndo = state.canUndo; canRedo = state.canRedo; }"
+            :width="selectedDisplay.width"  
             :height="selectedDisplay.height"
          />
       </div>
