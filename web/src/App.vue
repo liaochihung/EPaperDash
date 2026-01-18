@@ -1,9 +1,8 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import CanvasEditor from './components/CanvasEditor.vue';
 import AppLogo from './components/AppLogo.vue';
 import ToolSidebar from './components/ToolSidebar.vue';
-import EditToolbar from './components/EditToolbar.vue';
 import PropertiesPanel from './components/PropertiesPanel.vue';
 import DeviceSettingsDialog from './components/DeviceSettingsDialog.vue';
 import ConsolePanel from './components/ConsolePanel.vue';
@@ -109,6 +108,22 @@ const handleAddLine = () => canvasEditorRef.value?.addLine();
 const handleAddArrow = () => canvasEditorRef.value?.addArrow();
 const handleSelectAll = () => canvasEditorRef.value?.selectAll();
 
+const canvasScale = ref(1);
+const zoomIn = () => canvasEditorRef.value?.zoomIn();
+const zoomOut = () => canvasEditorRef.value?.zoomOut();
+const resetZoom = () => canvasEditorRef.value?.resetZoom();
+const setZoom = (val) => canvasEditorRef.value?.setZoom(val);
+
+const handleZoomInput = (e) => {
+    let val = parseInt(e.target.value);
+    if (!isNaN(val)) {
+        setZoom(val / 100);
+    }
+};
+
+const toolMode = ref('select');
+const setToolMode = (mode) => canvasEditorRef.value?.setToolMode(mode);
+
 // Weather sub-components
 const handleAddWeatherTemp = () => canvasEditorRef.value?.addWeatherTempNode();
 const handleAddWeatherHumidity = () => canvasEditorRef.value?.addWeatherHumidityNode();
@@ -129,6 +144,30 @@ const handleSaveProject = () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+    
+    // Mark as saved
+    canvasEditorRef.value.markSaved?.();
+};
+
+const handleNewProject = () => {
+    if (!canvasEditorRef.value) return;
+    
+    // Check if there are unsaved changes (isDirty is a computed ref)
+    const isDirtyValue = canvasEditorRef.value.isDirty?.value ?? false;
+    
+    if (isDirtyValue) {
+        // Ask if user wants to discard or save first
+        const saveFirst = confirm('You have unsaved changes. Click OK to save first, or Cancel to discard and create new.');
+        if (saveFirst) {
+            handleSaveProject();
+        }
+    }
+    
+    // Clear the canvas
+    canvasEditorRef.value.clearCanvas();
+    
+    // Clear localStorage
+    localStorage.removeItem('epaper_dash_layout');
 };
 
 const handleLoadProject = () => {
@@ -154,33 +193,48 @@ const handleLoadProject = () => {
     fileInput.click();
 };
 
-const handleKeydown = (e) => {
-    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+const handleKeyDown = (e) => {
+    // Canvas related shortcuts
+    if (e.ctrlKey) {
+        if (e.key === 'z') { e.preventDefault(); handleUndo(); }
+        if (e.key === 'y') { e.preventDefault(); handleRedo(); }
+        if (e.key === 's') { e.preventDefault(); handleSaveProject(); }
+        if (e.key === 'o') { e.preventDefault(); handleLoadProject(); }
+        if (e.key === 'a') { e.preventDefault(); handleSelectAll(); }
+        if (e.key === 'd') { e.preventDefault(); handleCopy(); }
+        if (e.key === '[') { e.preventDefault(); handleSendToBack(); }
+        if (e.key === ']') { e.preventDefault(); handleBringToFront(); }
+        if (e.key === 'n') { e.preventDefault(); handleNewProject(); }
+        if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn(); }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); }
+        if (e.key === '0') { e.preventDefault(); resetZoom(); }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            handleDelete();
+        }
+    } else if (e.key === 'g' || e.key === 'G') {
+        handleToggleGrid();
+    } else if (e.key === 'v' || e.key === 'V') {
+        setToolMode('select');
+    } else if (e.key === 'h' || e.key === 'H') {
+        setToolMode('pan');
+    } else if (e.key === ' ' && !isSpacePressed.value) {
+        // Space for temporary panning
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            isSpacePressed.value = true;
+            previousToolMode.value = toolMode.value;
+            setToolMode('pan');
+        }
+    }
+};
 
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-        canvasEditorRef.value?.deleteSelected();
-    }
-    
-    // Undo/Redo
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        handleUndo();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        handleRedo();
-    }
-    
-    // Copy
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-         handleCopy();
-    }
-    
-    // Select All
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        handleSelectAll();
+const handleKeyUp = (e) => {
+    if (e.key === ' ') {
+        if (isSpacePressed.value) {
+            isSpacePressed.value = false;
+            setToolMode(previousToolMode.value);
+        }
     }
 };
 
@@ -267,13 +321,162 @@ watch(selectedObject, (newVal) => {
     <main class="flex-1 flex flex-col relative min-w-0 bg-gray-100 dot-grid">
       
       <!-- Unified Top Header (Glass Bar) -->
-      <header class="relative z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/50 h-14 flex items-center justify-between px-3 md:px-4 shrink-0 shadow-sm">
+      <header class="relative z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/50 h-14 flex items-center justify-between px-4 shrink-0 shadow-sm">
           
-          <!-- Left: Logo -->
-          <AppLogo />
+          <!-- Left: Logo, File, Tool Actions -->
+          <div class="flex items-center gap-4">
+              <AppLogo />
+              <div class="w-px h-6 bg-gray-200 mx-1"></div>
+              
+              <!-- File Group -->
+              <div class="flex items-center gap-0.5">
+                  <button @click="handleNewProject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 transition-colors" title="New Project (Ctrl+N)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </button>
+                  <button @click="handleSaveProject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 transition-colors" title="Save Project (Ctrl+S)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                  </button>
+              </div>
 
-          <!-- Center: Device Controls (Scrollable on mobile) -->
-          <div class="flex-1 overflow-x-auto flex justify-center mx-2 no-scrollbar">
+              <div class="w-px h-6 bg-gray-200 mx-1"></div>
+
+              <!-- Tool Group (Select / Pan) -->
+              <div class="flex items-center bg-gray-100 p-1 rounded-lg gap-1">
+                  <button 
+                    @click="setToolMode('select')" 
+                    :class="toolMode === 'select' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    class="p-1.5 rounded-md transition-all duration-200" 
+                    title="Select Tool (V)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
+                    </svg>
+                  </button>
+                  <button 
+                    @click="setToolMode('pan')" 
+                    :class="toolMode === 'pan' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    class="p-1.5 rounded-md transition-all duration-200" 
+                    title="Hand Tool (H / Space)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0V12m3.153-1.46c.15-.436.467-.783.92-.893a1.5 1.5 0 011.897 1.77L15 19a3 3 0 01-3 3h-1.374a3 3 0 01-2.583-1.518L5.27 15.65a1.5 1.5 0 112.121-2.121l1.609 1.609V6.5a1.5 1.5 0 013 0v1.51" />
+                    </svg>
+                  </button>
+              </div>
+          </div>
+
+          <!-- Center: Edit Actions (The high-frequency tools) -->
+          <div class="flex items-center gap-1 bg-gray-100/50 p-1 rounded-lg border border-gray-200/50">
+              <!-- History -->
+              <div class="flex items-center px-1">
+                  <button @click="handleUndo" :disabled="!canUndo" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all" title="Undo (Ctrl+Z)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                  </button>
+                  <button @click="handleRedo" :disabled="!canRedo" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all" title="Redo (Ctrl+Y)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" /></svg>
+                  </button>
+              </div>
+
+              <div class="w-px h-4 bg-gray-300 mx-1"></div>
+
+              <!-- Content Actions -->
+              <div class="flex items-center px-1">
+                  <button @click="handleCopy" :disabled="!selectedObject" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 transition-all font-medium text-xs flex items-center gap-1.5" title="Duplicate (Ctrl+D)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V21a2 2 0 01-2 2h-6a2 2 0 01-2-2v-3" /></svg>
+                    <span class="hidden sm:inline">Copy</span>
+                  </button>
+                  <button @click="handleDelete" :disabled="!selectedObject" class="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-30 transition-all font-medium text-xs flex items-center gap-1.5 ml-1" title="Delete (Del)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    <span class="hidden sm:inline">Delete</span>
+                  </button>
+              </div>
+
+              <div class="w-px h-4 bg-gray-300 mx-1"></div>
+
+              <!-- View Actions -->
+              <div class="flex items-center px-1">
+                  <button @click="handleToggleGrid" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition-all" title="Toggle Grid (G)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" /></svg>
+                  </button>
+                  <button @click="handleSelectAll" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition-all font-medium text-xs ml-1" title="Select All (Ctrl+A)">
+                      ALL
+                  </button>
+              </div>
+
+              <div class="w-px h-4 bg-gray-300 mx-1"></div>
+
+              <!-- Zoom Control -->
+              <div class="flex items-center gap-1 px-1">
+                  <button @click="zoomOut" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition-all" title="Zoom Out (-)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" /></svg>
+                  </button>
+                  
+                  <div class="relative group">
+                      <input 
+                        type="text" 
+                        :value="Math.round(canvasScale * 100) + '%'"
+                        @change="handleZoomInput"
+                        class="w-12 py-1 text-[10px] font-bold text-gray-600 bg-transparent hover:bg-white hover:shadow-sm rounded text-center transition-all focus:outline-none focus:ring-1 focus:ring-blue-300 focus:bg-white"
+                        title="Enter zoom %"
+                      />
+                  </div>
+
+                  <button @click="zoomIn" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition-all" title="Zoom In (+)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                  </button>
+
+                  <button @click="resetZoom" class="p-1.5 rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition-all ml-1" title="Fit to Screen (0)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                  </button>
+              </div>
+          </div>
+
+          <!-- Right: Layering & View -->
+          <div class="flex items-center gap-1">
+              <button @click="handleBringToFront" :disabled="!selectedObject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors" title="Bring to Front">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              <button @click="handleSendToBack" :disabled="!selectedObject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors" title="Send to Back">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+          </div>
+      </header>
+
+      <div class="flex-1 relative overflow-hidden flex flex-col pt-0">
+         <CanvasEditor 
+            class="flex-1 w-full h-full"
+            ref="canvasEditorRef" 
+            @selected="handleSelected" 
+            @change="handleCanvasChange"
+            @history-change="(state) => { canUndo = state.canUndo; canRedo = state.canRedo; }"
+            @scale-change="(v) => canvasScale = v"
+            @tool-change="(v) => toolMode = v"
+            :width="selectedDisplay.width"  
+            :height="selectedDisplay.height"
+         />
+      </div>
+
+      <!-- New Status Bar (Device Controls) -->
+      <footer class="h-10 bg-white border-t border-gray-200 flex items-center justify-between px-4 z-40 shrink-0 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+          <div class="flex items-center gap-4 text-xs text-gray-500 font-medium">
+              <!-- Connection & Status -->
+              <div class="flex items-center gap-1.5 min-w-[120px]">
+                  <span :class="isConnected ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.4)]' : 'bg-red-400'" class="w-1.5 h-1.5 rounded-full transition-all duration-300"></span>
+                  <span class="text-gray-600 truncate">{{ isConnected ? 'Connected' : 'Disconnected' }}</span>
+              </div>
+              
+              <div class="w-px h-3 bg-gray-200"></div>
+              
+              <!-- Display Info (Compact) -->
+              <div class="flex items-center gap-2 text-gray-400" :title="selectedDisplay.name">
+                  <span class="text-gray-600">{{ selectedDisplay.name.split(' - ')[0] }}</span>
+                  <span>/</span>
+                  <span class="text-gray-600">{{ selectedColorMode.name.split(' (')[0] }}</span>
+              </div>
+          </div>
+
+          <!-- Bottom Actions: Device Toolbar Only -->
+          <div class="flex items-center gap-4">
               <DeviceToolbar 
                 :is-connected="isConnected"
                 :is-uploading="isUploading"
@@ -283,53 +486,10 @@ watch(selectedObject, (newVal) => {
                 @upload="handleUpload"
                 @open-settings="isSettingsOpen = true"
                 @toggle-console="isConsoleOpen = !isConsoleOpen"
+                class="scale-90 origin-right"
               />
           </div>
-
-          <!-- Right: File Actions -->
-          <div class="flex items-center gap-2 shrink-0">
-               <button @click="handleSaveProject" class="p-1.5 rounded-md text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200" title="Save Project">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-              </button>
-
-              <button @click="handleLoadProject" class="p-1.5 rounded-md text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200" title="Load Project">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </button>
-          </div>
-      </header>
-
-      <!-- Edit Toolbar (Floating Bottom Center) -->
-      <!-- Adjusted positioning to floating style -->
-      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
-          <EditToolbar
-            @toggle-grid="handleToggleGrid"
-            @bring-to-front="handleBringToFront"
-            @send-to-back="handleSendToBack"
-            @copy="handleCopy"
-            @delete="handleDelete"
-            @undo="handleUndo"
-            @redo="handleRedo"
-            @select-all="handleSelectAll"
-            :can-undo="canUndo"
-            :can-redo="canRedo"
-          />
-      </div>
-      
-      <div class="flex-1 relative overflow-hidden flex flex-col pt-0">
-         <CanvasEditor 
-            class="flex-1 w-full h-full"
-            ref="canvasEditorRef" 
-            @selected="handleSelected" 
-            @change="handleCanvasChange"
-            @history-change="(state) => { canUndo = state.canUndo; canRedo = state.canRedo; }"
-            :width="selectedDisplay.width"  
-            :height="selectedDisplay.height"
-         />
-      </div>
+      </footer>
     </main>
 
     <!-- Right Sidebar: Properties (Docked but floating look) -->

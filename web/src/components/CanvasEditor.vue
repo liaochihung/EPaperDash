@@ -13,7 +13,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['selected', 'change', 'history-change']);
+const emit = defineEmits(['selected', 'change', 'history-change', 'scale-change', 'tool-change']);
 
 const stageContainer = ref(null);
 let resizeObserver = null;
@@ -56,6 +56,17 @@ const {
     redo,
     canUndo,
     canRedo,
+    isDirty,
+    markSaved,
+    clearCanvas,
+    scale,
+    setZoom,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    centerStage,
+    toolMode,
+    setToolMode,
     selectAll,
     getRelativePointerPosition,
     stage // access ref if needed for cleanup
@@ -87,6 +98,15 @@ watch(() => [props.width, props.height], ([newW, newH]) => {
 // Watch History State
 watch([canUndo, canRedo], ([undoState, redoState]) => {
     emit('history-change', { canUndo: undoState, canRedo: redoState });
+});
+
+// Watch Zoom & Tool Mode to sync with parent UI
+watch(scale, (newScale) => {
+    emit('scale-change', newScale);
+});
+
+watch(toolMode, (newMode) => {
+    emit('tool-change', newMode);
 });
 
 // Expose methods to parent
@@ -124,8 +144,40 @@ defineExpose({
     addBatteryNode,
     canUndo,
     canRedo,
+    isDirty,
+    markSaved,
+    clearCanvas,
+    scale,
+    setZoom,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    setZoom,
+    centerStage,
+    toolMode,
+    setToolMode,
     selectAll
 });
+
+// Handle Wheel Zoom
+const handleWheel = (e) => {
+    // Ctrl + Wheel to zoom
+    if (e.ctrlKey) {
+        e.preventDefault();
+        const stagePtr = stage.value.getPointerPosition();
+        if (!stagePtr) return;
+
+        const oldScale = scale.value;
+        const pointer = { x: stagePtr.x, y: stagePtr.y };
+
+        const zoomBy = 1.1;
+        const newScale = e.deltaY < 0 ? oldScale * zoomBy : oldScale / zoomBy;
+
+        setZoom(newScale, pointer);
+    } 
+    // Wheel to Pan (if toolMode is pan) - implicit by Konva Draggable usually,
+    // but if we want wheel panning (shift+wheel) we can add later
+};
 
 const handleDrop = (e) => {
     e.preventDefault();
@@ -171,6 +223,7 @@ const handleDrop = (e) => {
     class="w-full h-full bg-transparent"
     @dragover.prevent
     @drop="handleDrop"
+    @wheel="handleWheel"
   >
     <!-- Konva will attach here with its own canvas -->
   </div>

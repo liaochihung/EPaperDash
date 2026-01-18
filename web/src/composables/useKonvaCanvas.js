@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import Konva from 'konva';
 import { useHistory } from './useHistory';
 
@@ -10,6 +10,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     const selectedId = ref(null);
     const gridLayer = ref(null);
     const showGrid = ref(false);
+    const scale = ref(1); // Zoom level
+    const toolMode = ref('select'); // 'select' or 'pan'
 
     // Selection state
     const selectionRect = ref(null);
@@ -25,13 +27,38 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         redo: historyRedo,
         reset: resetHistory,
         canUndo,
-        canRedo
+        canRedo,
+        isDirty,
+        markSaved
     } = useHistory();
 
     const saveHistory = () => {
         if (!paperGroup.value) return;
         const state = exportState();
         pushState(state);
+    };
+
+    const clearCanvas = () => {
+        if (!paperGroup.value) return;
+
+        // Remove all children except the background
+        const children = paperGroup.value.getChildren((node) => node.id() !== 'paper-bg');
+        children.forEach(c => c.destroy());
+
+        // Clear transformer selection
+        if (transformer.value) {
+            transformer.value.nodes([]);
+        }
+        selectedId.value = null;
+        emit('selected', null);
+
+        // Redraw and reset history
+        if (layer.value) {
+            layer.value.batchDraw();
+        }
+        resetHistory();
+        saveHistory();
+        emit('change');
     };
 
     const undo = () => {
@@ -55,6 +82,71 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             emit('selected', null);
 
             importState(nextState, false);
+            emit('change');
+        }
+    };
+
+    const setZoom = (newScale, centerPoint = null) => {
+        if (!stage.value) return;
+
+        const oldScale = stage.value.scaleX();
+        const stageCenter = {
+            x: stage.value.width() / 2,
+            y: stage.value.height() / 2
+        };
+
+        // Point to zoom towards (default to stage center)
+        const point = centerPoint || stageCenter;
+
+        const mousePointTo = {
+            x: (point.x - stage.value.x()) / oldScale,
+            y: (point.y - stage.value.y()) / oldScale,
+        };
+
+        const limitedScale = Math.max(0.1, Math.min(5, newScale));
+        scale.value = limitedScale;
+
+        const newPos = {
+            x: point.x - mousePointTo.x * limitedScale,
+            y: point.y - mousePointTo.y * limitedScale,
+        };
+
+        stage.value.scale({ x: limitedScale, y: limitedScale });
+        stage.value.position(newPos);
+        stage.value.batchDraw();
+    };
+
+    const zoomIn = () => setZoom(scale.value * 1.2);
+    const zoomOut = () => setZoom(scale.value / 1.2);
+    const resetZoom = () => {
+        if (!stage.value) return;
+        setZoom(1);
+        // Small delay to ensure scale update propagates if needed, though usually synchronous
+        setTimeout(centerStage, 0);
+    };
+
+    const centerStage = () => {
+        if (!stage.value) return;
+        const stageW = stage.value.width();
+        const stageH = stage.value.height();
+
+        // Paper bounds
+        const paperW = props.width || 648;
+        const paperH = props.height || 480;
+
+        const currentScale = scale.value;
+        const newX = (stageW - paperW * currentScale) / 2;
+        const newY = (stageH - paperH * currentScale) / 2;
+
+        stage.value.position({ x: newX, y: newY });
+        stage.value.batchDraw();
+    };
+
+    const setToolMode = (mode) => {
+        toolMode.value = mode;
+        if (stage.value) {
+            stage.value.draggable(mode === 'pan');
+            stage.value.container().style.cursor = mode === 'pan' ? 'grab' : 'default';
         }
     };
 
@@ -76,8 +168,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
         // 2. Paper Group
         paperGroup.value = new Konva.Group({
-            x: (width - props.width) / 2,
-            y: (height - props.height) / 2,
+            x: 0,
+            y: 0,
             width: props.width,
             height: props.height,
         });
@@ -124,17 +216,79 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             visible: false,
             listening: false, // Do not catch events
         });
-        layer.value.add(selectionRect.value);
+        paperGroup.value.add(selectionRect.value);
 
         // 6. Events
         setupEvents();
 
         // Initial history save
+        // Initial history save
         saveHistory();
+
+        // Initial Center
+        centerStage();
     };
+
+    const isKeyboardMoving = ref(false);
+
+    const handleKeyDown = (e) => {
+        const nodes = transformer.value.nodes();
+        if (nodes.length === 0) return;
+
+        // Check if typing in an input element
+        if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+        const step = e.shiftKey ? 10 : 1;
+        let moved = false;
+
+        switch (e.key) {
+            case 'ArrowUp':
+                nodes.forEach(node => node.y(node.y() - step));
+                moved = true;
+                break;
+            case 'ArrowDown':
+                nodes.forEach(node => node.y(node.y() + step));
+                moved = true;
+                break;
+            case 'ArrowLeft':
+                nodes.forEach(node => node.x(node.x() - step));
+                moved = true;
+                break;
+            case 'ArrowRight':
+                nodes.forEach(node => node.x(node.x() + step));
+                moved = true;
+                break;
+        }
+
+        if (moved) {
+            e.preventDefault();
+            layer.value.batchDraw();
+            isKeyboardMoving.value = true;
+            if (nodes.length === 1) emitNodeProperties(nodes[0]);
+        }
+    };
+
+    const handleKeyUp = (e) => {
+        if (isKeyboardMoving.value) {
+            // Save history only when we stop moving
+            saveHistory();
+            emit('change');
+            isKeyboardMoving.value = false;
+        }
+    };
+
+    onUnmounted(() => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+    });
 
     const setupEvents = () => {
         if (!stage.value) return;
+
+        // Keyboard events
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
 
         stage.value.on('click tap', (e) => {
             const target = e.target;
@@ -194,8 +348,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             }
 
             e.evt.preventDefault();
-            const pos = stage.value.getPointerPosition();
-            selectionStart.value = { x: pos.x, y: pos.y }; // Relative to stage
+            const pos = stage.value.getRelativePointerPosition();
+            selectionStart.value = { x: pos.x, y: pos.y }; // Relative to stage content
 
             selectionRect.value.width(0);
             selectionRect.value.height(0);
@@ -207,49 +361,60 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             if (!isSelecting.value) return;
 
             e.evt.preventDefault();
-            const pos = stage.value.getPointerPosition();
+            const pos = stage.value.getRelativePointerPosition();
+
+            const x = Math.min(selectionStart.value.x, pos.x);
+            const y = Math.min(selectionStart.value.y, pos.y);
+            const w = Math.abs(pos.x - selectionStart.value.x);
+            const h = Math.abs(pos.y - selectionStart.value.y);
 
             selectionRect.value.setAttrs({
-                x: Math.min(selectionStart.value.x, pos.x),
-                y: Math.min(selectionStart.value.y, pos.y),
-                width: Math.abs(pos.x - selectionStart.value.x),
-                height: Math.abs(pos.y - selectionStart.value.y),
+                x: x,
+                y: y,
+                width: w,
+                height: h,
             });
+            layer.value.batchDraw();
         });
 
         stage.value.on('mouseup touchend', (e) => {
             if (!isSelecting.value) return;
-
             isSelecting.value = false;
 
             if (!selectionRect.value.visible()) return;
 
             e.evt.preventDefault();
-            selectionRect.value.visible(false);
 
-            const sr = selectionRect.value.getClientRect();
+            // Use the engine's absolute bounding box calculation
+            // We must capture it while the node is visible
+            const box = selectionRect.value.getClientRect();
+
+            // Hide the visual rect immediately after
+            selectionRect.value.visible(false);
 
             // Find intersecting nodes
             const children = paperGroup.value.getChildren();
             const selected = children.filter(node => {
+                // Skip background and the selection rect itself
                 if (node.id() === 'paper-bg') return false;
+                if (node === selectionRect.value) return false;
+                if (!node.visible()) return false;
 
-                // Use client rect for intersection
-                // The selection rect is in stage coords (absolute)
-                // The node is in group coords, but getClientRect returns absolute
-                const nr = node.getClientRect();
-
-                return Konva.Util.haveIntersection(sr, nr);
+                // Intersection check using absolute boxes
+                return Konva.Util.haveIntersection(box, node.getClientRect());
             });
 
             transformer.value.nodes(selected);
             if (selected.length > 0) {
-                // Maybe communicate specific selection info if needed
                 selectedId.value = selected[0].id();
+                emitNodeProperties(selected[selected.length - 1]);
             } else {
                 selectedId.value = null;
                 emit('selected', null);
             }
+
+            // Force redraw to clear the selection rect artifacts
+            layer.value.batchDraw();
         });
 
         // Snap to grid on drag
@@ -358,16 +523,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
     };
 
     const recenterPaper = () => {
-        if (!stage.value || !paperGroup.value) return;
-
-        const w = stage.value.width();
-        const h = stage.value.height();
-
-        const paperX = Math.floor((w - props.width) / 2);
-        const paperY = Math.floor((h - props.height) / 2);
-
-        paperGroup.value.position({ x: paperX, y: paperY });
-        layer.value.batchDraw();
+        // Deprecated: Just alias to centerStage to ensure consistency
+        centerStage();
     };
 
     const fitStageToParent = () => {
@@ -376,7 +533,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         const height = stageContainer.value.offsetHeight;
         stage.value.width(width);
         stage.value.height(height);
-        recenterPaper();
+        centerStage();
     };
 
     // Public Actions
@@ -522,6 +679,12 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         const oldNodes = transformer.value.nodes();
         transformer.value.nodes([]);
 
+        // Hide grid layer (so grid lines don't appear in export)
+        const gridWasVisible = gridLayer.value && gridLayer.value.visible();
+        if (gridLayer.value) {
+            gridLayer.value.hide();
+        }
+
         // Hide dynamic nodes if requested
         if (excludeDynamic) {
             const dynamicTypes = [
@@ -555,6 +718,11 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
         // Restore visibility
         hiddenNodes.forEach(node => node.show());
+
+        // Restore grid layer visibility
+        if (gridWasVisible && gridLayer.value) {
+            gridLayer.value.show();
+        }
 
         // Restore transformer
         transformer.value.nodes(oldNodes);
@@ -674,7 +842,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             bg.height(newH);
             paperGroup.value.width(newW);
             paperGroup.value.height(newH);
-            recenterPaper();
+            centerStage();
             saveHistory();
         }
     };
@@ -1345,6 +1513,17 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         resetHistory, // Expose reset
         canUndo,
         canRedo,
+        isDirty,
+        markSaved,
+        clearCanvas,
+        scale,
+        setZoom,
+        zoomIn,
+        zoomOut,
+        resetZoom,
+        centerStage,
+        toolMode,
+        setToolMode,
         selectAll,
         getRelativePointerPosition
     };

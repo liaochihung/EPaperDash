@@ -35,22 +35,22 @@ const colorModeModel = computed({
     <!-- Display Selector -->
     <select 
       v-model="displayModel" 
-      class="hidden lg:block px-3 py-1.5 bg-gray-50/50 border border-gray-200 rounded-md text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer hover:bg-white" 
-      aria-label="Select Display Size"
+      class="hidden lg:block px-2 py-1 bg-gray-50/50 border border-gray-200 rounded-md text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer hover:bg-white max-w-[120px]" 
+      :title="displayModel.name"
     >
       <option v-for="opt in displayOptions" :key="opt.id" :value="opt">
-        {{ opt.name }}
+        {{ opt.name.split(' - ')[0] }}
       </option>
     </select>
 
     <!-- Color Mode Selector -->
     <select 
       v-model="colorModeModel" 
-      class="hidden lg:block px-3 py-1.5 bg-gray-50/50 border border-gray-200 rounded-md text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer hover:bg-white" 
-      aria-label="Select Color Mode"
+      class="hidden lg:block px-2 py-1 bg-gray-50/50 border border-gray-200 rounded-md text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer hover:bg-white" 
+      :title="colorModeModel.name"
     >
       <option v-for="opt in colorModes" :key="opt.id" :value="opt">
-        {{ opt.name }}
+        {{ opt.name.split(' (')[0] }}
       </option>
     </select>
 

@@ -5,9 +5,11 @@ export function useHistory(initialState = null, options = {}) {
     const history = ref(initialState ? [initialState] : []);
     const currentIndex = ref(initialState ? 0 : -1);
     const isUpdating = ref(false);
+    const savedIndex = ref(initialState ? 0 : -1); // Track where we last saved
 
     const canUndo = computed(() => currentIndex.value > 0);
     const canRedo = computed(() => currentIndex.value < history.value.length - 1);
+    const isDirty = computed(() => currentIndex.value !== savedIndex.value);
 
     /**
      * Saves a new state to history.
@@ -69,6 +71,14 @@ export function useHistory(initialState = null, options = {}) {
     const reset = (state = null) => {
         history.value = state ? [state] : [];
         currentIndex.value = state ? 0 : -1;
+        savedIndex.value = state ? 0 : -1;
+    };
+
+    /**
+     * Marks current state as saved (for dirty detection).
+     */
+    const markSaved = () => {
+        savedIndex.value = currentIndex.value;
     };
 
     // Helper to wrap an action that shouldn't trigger pushState (if using watchers)
@@ -82,12 +92,15 @@ export function useHistory(initialState = null, options = {}) {
     return {
         history,
         currentIndex,
+        savedIndex,
         canUndo,
         canRedo,
+        isDirty,
         pushState,
         undo,
         redo,
         reset,
+        markSaved,
         withoutHistory
     };
 }
