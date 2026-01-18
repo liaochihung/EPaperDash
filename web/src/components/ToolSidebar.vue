@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 
-const emit = defineEmits(['add-text', 'add-image', 'add-time', 'add-date', 'add-weather']);
+const emit = defineEmits(['add-text', 'add-image', 'add-time', 'add-date', 'add-weather', 'add-rect', 'add-circle', 'add-battery']);
 const fileInput = ref(null);
 
 // Accordion State
@@ -66,11 +66,35 @@ const handleDragStart = (e, type, payload = null) => {
                         class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
                         draggable="true"
                         @dragstart="(e) => handleDragStart(e, 'rect')"
-                        @click="$emit('add-text')" 
+                        @click="$emit('add-rect')" 
                     >
-                        <!-- Todo: Implement Rect actual add -->
                         <div class="w-8 h-5 border-2 border-gray-800 mb-1"></div>
                         <span class="text-[10px] text-gray-500 uppercase font-medium">Rect</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'circle')"
+                        @click="$emit('add-circle')" 
+                    >
+                        <div class="w-6 h-6 border-2 border-gray-800 rounded-full mb-1"></div>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Circle</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'battery')"
+                        @click="$emit('add-battery')" 
+                    >
+                        <!-- Simple Battery Icon -->
+                        <svg class="h-6 w-6 text-gray-800 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18v-2a6 6 0 016-6v0a6 6 0 016 6v2a6 6 0 01-6 6v0a6 6 0 01-6-6zm-6-2v2a6 6 0 016 6v0a6 6 0 016-6v-2a6 6 0 01-6-6v0a6 6 0 01-6 6z" style="display:none" /> 
+                           <!-- Real Battery Path -->
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10V6a2 2 0 012-2h10a2 2 0 012 2v4M3 14v4a2 2 0 002 2h10a2 2 0 002-2v-4M21 10v4" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Battery</span>
                     </div>
                 </div>
             </div>

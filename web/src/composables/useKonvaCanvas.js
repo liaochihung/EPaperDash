@@ -305,7 +305,19 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                     item.attrs.draggable = true;
                 }
 
-                if (item.className === 'Text') {
+                if (item.attrs) {
+                    item.attrs.draggable = true;
+                }
+
+                if (['Rect', 'Circle'].includes(item.className) && item.id !== 'paper-bg') {
+                    // Generic shape handling
+                    let node;
+                    if (item.className === 'Rect') node = new Konva.Rect(item.attrs);
+                    if (item.className === 'Circle') node = new Konva.Circle(item.attrs);
+
+                    setupCursorEvents(node);
+                    paperGroup.value.add(node);
+                } else if (item.className === 'Text') {
                     const node = new Konva.Text(item.attrs);
                     // Re-add custom hitFunc
                     node.hitFunc(function (context) {
@@ -532,6 +544,103 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
+    const addRect = () => {
+        if (!paperGroup.value) return;
+        const rect = new Konva.Rect({
+            x: 50,
+            y: 50,
+            width: 100,
+            height: 100,
+            fill: 'transparent',
+            stroke: 'black',
+            strokeWidth: 2,
+            draggable: true,
+            id: `rect-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(rect);
+        paperGroup.value.add(rect);
+        selectNode(rect);
+        emit('change');
+    };
+
+    const addCircle = () => {
+        if (!paperGroup.value) return;
+        const circle = new Konva.Circle({
+            x: 100,
+            y: 100,
+            radius: 50,
+            fill: 'transparent',
+            stroke: 'black',
+            strokeWidth: 2,
+            draggable: true,
+            id: `circle-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(circle);
+        paperGroup.value.add(circle);
+        selectNode(circle);
+        emit('change');
+    };
+
+    const addBatteryNode = () => {
+        if (!paperGroup.value) return;
+        const group = new Konva.Group({
+            x: 50,
+            y: 50,
+            draggable: true,
+            id: `battery-${Date.now()}`,
+            name: 'editable-group'
+        });
+
+        // Battery Body
+        const body = new Konva.Rect({
+            width: 40,
+            height: 20,
+            stroke: 'black',
+            strokeWidth: 2,
+            cornerRadius: 2
+        });
+
+        // Battery Tip
+        const tip = new Konva.Rect({
+            x: 40,
+            y: 5,
+            width: 4,
+            height: 10,
+            fill: 'black'
+        });
+
+        // Level (75%)
+        const level = new Konva.Rect({
+            x: 4,
+            y: 4,
+            width: 24,
+            height: 12,
+            fill: 'black'
+        });
+
+        // Percentage Text
+        const text = new Konva.Text({
+            x: 0,
+            y: 24,
+            text: '80%',
+            fontSize: 14,
+            fontFamily: 'sans-serif',
+            fill: 'black'
+        });
+
+        group.add(body);
+        group.add(tip);
+        group.add(level);
+        group.add(text);
+
+        setupCursorEvents(group);
+        paperGroup.value.add(group);
+        selectNode(group);
+        emit('change');
+    };
+
     // Partial Area Export
     const getPartialDataURL = (x, y, width, height) => {
         if (!stage.value) return null;
@@ -576,6 +685,10 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         addTimeNode,
         addWeatherNode,
         addDateNode,
-        getPartialDataURL
+        addDateNode,
+        getPartialDataURL,
+        addRect,
+        addCircle,
+        addBatteryNode
     };
 }

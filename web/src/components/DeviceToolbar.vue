@@ -23,7 +23,7 @@ const colorModeModel = computed({
 </script>
 
 <template>
-  <div class="flex items-center gap-2 p-2 bg-white/70 backdrop-blur-md rounded-full border border-white/20 shadow-lg pointer-events-auto">
+  <div class="flex items-center gap-2 pointer-events-auto">
     
     <!-- Connection Status Indicator -->
     <div class="flex items-center px-2 py-1 rounded-full bg-gray-100 border border-gray-200" title="Connection Status">

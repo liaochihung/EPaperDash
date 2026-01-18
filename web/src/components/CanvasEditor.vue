@@ -38,6 +38,9 @@ const {
     addWeatherNode,
     addDateNode,
     getPartialDataURL,
+    addRect,
+    addCircle,
+    addBatteryNode,
     stage // access ref if needed for cleanup
 } = useKonvaCanvas(stageContainer, props, emit);
 
@@ -95,7 +98,9 @@ const handleDrop = (e) => {
             case 'time': addTimeNode(); break;
             case 'date': addDateNode(); break;
             case 'weather': addWeatherNode(); break;
-            case 'rect': addText(); break; // Rect not implemented yet, fallback to text
+            case 'rect': addRect(); break;
+            case 'circle': addCircle(); break;
+            case 'battery': addBatteryNode(); break;
             default: break;
         }
     } catch (err) {

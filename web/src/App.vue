@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import CanvasEditor from './components/CanvasEditor.vue';
-import AppHeader from './components/AppHeader.vue';
+import AppLogo from './components/AppLogo.vue';
 import ToolSidebar from './components/ToolSidebar.vue';
 import EditToolbar from './components/EditToolbar.vue';
 import PropertiesPanel from './components/PropertiesPanel.vue';
@@ -195,25 +195,41 @@ watch(selectedObject, (newVal) => {
     <!-- Center: Workspace -->
     <main class="flex-1 flex flex-col relative min-w-0 bg-gray-100 dot-grid">
       
-      <!-- New App Header (Floating Top) -->
-      <AppHeader
-        @save="handleSaveProject"
-        @load="handleLoadProject"
-      />
+      <!-- Unified Top Header (Glass Bar) -->
+      <header class="relative z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/50 h-14 flex items-center justify-between px-3 md:px-4 shrink-0 shadow-sm">
+          
+          <!-- Left: Logo -->
+          <AppLogo />
 
-      <!-- Device Toolbar (Floating Island) -->
-      <div class="absolute top-4 left-1/2 -translate-x-1/2 z-40">
-        <DeviceToolbar 
-            :is-connected="isConnected"
-            :is-uploading="isUploading"
-            v-model:selected-display="selectedDisplay"
-            v-model:selected-color-mode="selectedColorMode"
-            @connect="handleConnect"
-            @upload="handleUpload"
-            @open-settings="isSettingsOpen = true"
-            @toggle-console="isConsoleOpen = !isConsoleOpen"
-        />
-      </div>
+          <!-- Center: Device Controls (Scrollable on mobile) -->
+          <div class="flex-1 overflow-x-auto flex justify-center mx-2 no-scrollbar">
+              <DeviceToolbar 
+                :is-connected="isConnected"
+                :is-uploading="isUploading"
+                v-model:selected-display="selectedDisplay"
+                v-model:selected-color-mode="selectedColorMode"
+                @connect="handleConnect"
+                @upload="handleUpload"
+                @open-settings="isSettingsOpen = true"
+                @toggle-console="isConsoleOpen = !isConsoleOpen"
+              />
+          </div>
+
+          <!-- Right: File Actions -->
+          <div class="flex items-center gap-2 shrink-0">
+               <button @click="handleSaveProject" class="p-1.5 rounded-md text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200" title="Save Project">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+              </button>
+
+              <button @click="handleLoadProject" class="p-1.5 rounded-md text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200" title="Load Project">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </button>
+          </div>
+      </header>
 
       <!-- Edit Toolbar (Floating Bottom Center) -->
       <!-- Adjusted positioning to floating style -->
