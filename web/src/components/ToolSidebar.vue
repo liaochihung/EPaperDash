@@ -4,70 +4,156 @@ import { ref } from 'vue';
 const emit = defineEmits(['add-text', 'add-image', 'add-time', 'add-date', 'add-weather']);
 const fileInput = ref(null);
 
-const handleAddImageClick = () => {
-    fileInput.value?.click();
+// Accordion State
+const openCategories = ref({
+    basic: true,
+    data: true,
+    media: true
+});
+
+const toggleCategory = (cat) => {
+    openCategories.value[cat] = !openCategories.value[cat];
 };
 
-const onFileSelected = (event) => {
-    const file = event.target.files[0];
+const handleFileSelect = (e) => {
+    const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            emit('add-image', e.target.result);
-        };
+        reader.onload = (evt) => emit('add-image', evt.target.result);
         reader.readAsDataURL(file);
     }
-    // Reset input
-    event.target.value = '';
+    e.target.value = '';
+};
+
+// Drag Start Handler
+const handleDragStart = (e, type, payload = null) => {
+    e.dataTransfer.setData('application/json', JSON.stringify({ type, payload }));
+    e.dataTransfer.effectAllowed = 'copy';
 };
 </script>
 
 <template>
-    <aside class="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-4 shadow-sm z-10 shrink-0" aria-label="Toolbox">
-      <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="onFileSelected" />
-      <div class="font-bold text-[0.6rem] text-center mb-2 text-gray-500 uppercase">Tools</div>
-      
-      <button @click="$emit('add-text')" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors group relative" aria-label="Add Text" title="Add Text">
-        <span class="font-serif font-bold text-xl" aria-hidden="true">T</span>
-      </button>
-      
-      <button @click="handleAddImageClick" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors group relative" aria-label="Add Image" title="Add Image">
-         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-      </button>
+    <aside class="w-60 bg-white border-r border-gray-200 flex flex-col z-10 shrink-0 h-full shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+        
+        <!-- Helper Title -->
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Components</span>
+        </div>
 
-      <!-- Divider -->
-      <div class="w-8 h-px bg-gray-300"></div>
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+            
+            <!-- Category: Basic -->
+            <div class="border-b border-gray-100">
+                <button @click="toggleCategory('basic')" class="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                    <span class="text-sm font-semibold text-gray-700">Basic</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': !openCategories.basic }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                
+                <div v-show="openCategories.basic" class="grid grid-cols-2 gap-2 p-3 bg-gray-50/50 transition-all">
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'text')"
+                        @click="$emit('add-text')"
+                    >
+                        <span class="font-serif font-bold text-2xl text-gray-800 mb-1">T</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Text</span>
+                    </div>
 
-      <!-- Time -->
-      <button @click="$emit('add-time')" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors" aria-label="Add Time" title="Add Time">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </button>
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'rect')"
+                        @click="$emit('add-text')" 
+                    >
+                        <!-- Todo: Implement Rect actual add -->
+                        <div class="w-8 h-5 border-2 border-gray-800 mb-1"></div>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Rect</span>
+                    </div>
+                </div>
+            </div>
 
-      <!-- Date -->
-      <button @click="$emit('add-date')" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors" aria-label="Add Date" title="Add Date">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      </button>
+            <!-- Category: Live Data -->
+            <div class="border-b border-gray-100">
+                <button @click="toggleCategory('data')" class="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                    <span class="text-sm font-semibold text-gray-700">Live Data</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': !openCategories.data }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
 
-      <!-- Weather -->
-      <button @click="$emit('add-weather')" class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors" aria-label="Add Weather" title="Add Weather">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-        </svg>
-      </button>
+                <div v-show="openCategories.data" class="grid grid-cols-2 gap-2 p-3 bg-gray-50/50">
+                    
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'time')"
+                        @click="$emit('add-time')"
+                    >
+                        <span class="text-lg font-mono font-bold text-gray-800 mb-1">12:30</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Time</span>
+                    </div>
 
-      <!-- Divider -->
-      <div class="w-8 h-px bg-gray-300"></div>
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'date')"
+                        @click="$emit('add-date')"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Date</span>
+                    </div>
 
-      <button class="w-10 h-10 rounded hover:bg-gray-100 flex items-center justify-center border border-transparent hover:border-gray-300 transition-colors group relative" aria-label="Shapes" title="Shapes">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-        </svg>
-      </button>
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'weather')"
+                        @click="$emit('add-weather')"
+                    >
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-700 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Weather</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category: Media -->
+            <div class="border-b border-gray-100">
+                <button @click="toggleCategory('media')" class="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                    <span class="text-sm font-semibold text-gray-700">Media</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': !openCategories.media }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <div v-show="openCategories.media" class="grid grid-cols-2 gap-2 p-3 bg-gray-50/50">
+                    <button 
+                        @click="fileInput.click()"
+                        class="h-20 bg-white border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:bg-blue-50 transition-all text-gray-400 hover:text-blue-500"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span class="text-[10px] uppercase font-medium">Upload Img</span>
+                    </button>
+                    <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileSelect" />
+                </div>
+            </div>
+
+        </div>
     </aside>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+}
+</style>

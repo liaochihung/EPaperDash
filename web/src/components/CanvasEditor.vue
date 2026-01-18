@@ -82,10 +82,35 @@ defineExpose({
     addDateNode,
     getPartialDataURL
 });
+
+const handleDrop = (e) => {
+    e.preventDefault();
+    try {
+        const raw = e.dataTransfer.getData('application/json');
+        if (!raw) return;
+        const { type } = JSON.parse(raw);
+        
+        switch (type) {
+            case 'text': addText(); break;
+            case 'time': addTimeNode(); break;
+            case 'date': addDateNode(); break;
+            case 'weather': addWeatherNode(); break;
+            case 'rect': addText(); break; // Rect not implemented yet, fallback to text
+            default: break;
+        }
+    } catch (err) {
+        console.error("Drop error", err);
+    }
+};
 </script>
 
 <template>
-  <div ref="stageContainer" class="w-full h-full bg-gray-200">
+  <div 
+    ref="stageContainer" 
+    class="w-full h-full bg-transparent"
+    @dragover.prevent
+    @drop="handleDrop"
+  >
     <!-- Konva will attach here with its own canvas -->
   </div>
 </template>

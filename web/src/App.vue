@@ -7,6 +7,7 @@ import EditToolbar from './components/EditToolbar.vue';
 import PropertiesPanel from './components/PropertiesPanel.vue';
 import DeviceSettingsDialog from './components/DeviceSettingsDialog.vue';
 import ConsolePanel from './components/ConsolePanel.vue';
+import DeviceToolbar from './components/DeviceToolbar.vue'; // New Import
 
 import { useWebSerial } from './composables/useWebSerial';
 import { useFirmwareUpload } from './composables/useFirmwareUpload';
@@ -34,22 +35,15 @@ const addLog = (text) => {
 
 // Handle incoming serial data
 onLineReceived.value = (line) => {
-    // Always log to console
     addLog(line);
-
     try {
         const data = JSON.parse(line);
         console.log("RX:", data);
-        
-        // Route to Dialog if scanning
         if (data.result === 'scan_complete' && data.networks) {
             settingsDialogRef.value?.updateWifiList(data.networks);
         }
-        
-        // Handle other async responses if needed
     } catch (e) {
-        // Not JSON or partial, ignore
-        // This is expected for standard debug logs
+        // Ignore
     }
 };
 
@@ -57,36 +51,22 @@ const handleSendCommand = (cmdObj) => {
     sendJSON(cmdObj);
 };
 
-const selectedDisplay = ref(displayOptions.find(d => d.width === 648) || displayOptions[0]); // Default to user's 5.83"
+const selectedDisplay = ref(displayOptions.find(d => d.width === 648) || displayOptions[0]);
 const selectedColorMode = ref(colorModes[0]);
 
-// Attach sendJSON to sendBinary for useFirmwareUpload compatibility
 sendBinary.sendJSON = sendJSON;
+const { isUploading, uploadToScreen } = useFirmwareUpload(sendBinary, isConnected);
 
-const { isUploading, uploadToScreen, uploadPartialUpdate } = useFirmwareUpload(sendBinary, isConnected);
-
-// Auto-refresh state
-const updateCounter = ref(0);
-const FULL_REFRESH_INTERVAL = 10; // Full refresh every 10 partial updates
-
-// Auto-refresh logic for dynamic nodes (time, date, weather)
 onMounted(() => {
     globalThis.addEventListener('keydown', handleKeydown);
-    
-    // Restore state
     const saved = localStorage.getItem('epaper_dash_layout');
     if (saved) {
         setTimeout(() => {
             canvasEditorRef.value?.importState(saved);
         }, 100);
     }
-
-    // Start auto-refresh timer (every minute)
-    // Code removed for clarity - can be re-added if dynamic features are enabled again
-
-    // Cleanup on unmount
     onUnmounted(() => {
-        clearInterval(refreshInterval);
+        // globalThis.removeEventListener('keydown', handleKeydown); // Optional cleanup
     });
 });
 
@@ -102,60 +82,28 @@ const handleUpload = () => {
     uploadToScreen(canvasEditorRef.value, selectedDisplay.value, selectedColorMode.value);
 };
 
-const handleAddText = () => {
-    canvasEditorRef.value?.addText();
-};
-
-const handleAddImage = (dataUrl) => {
-    canvasEditorRef.value?.addImage(dataUrl);
-};
-
-const handleToggleGrid = () => {
-    canvasEditorRef.value?.toggleGrid();
-};
-
-const handleBringToFront = () => {
-    canvasEditorRef.value?.bringToFront();
-};
-
-const handleSendToBack = () => {
-    canvasEditorRef.value?.sendToBack();
-};
-
-const handleCopy = () => {
-    canvasEditorRef.value?.copySelected();
-};
-
+const handleAddText = () => canvasEditorRef.value?.addText();
+const handleAddImage = (dataUrl) => canvasEditorRef.value?.addImage(dataUrl);
+const handleToggleGrid = () => canvasEditorRef.value?.toggleGrid();
+const handleBringToFront = () => canvasEditorRef.value?.bringToFront();
+const handleSendToBack = () => canvasEditorRef.value?.sendToBack();
+const handleCopy = () => canvasEditorRef.value?.copySelected();
 const handleDelete = () => {
     if (!selectedObject.value) return;
-    
-    const confirmDelete = confirm(`Delete "${selectedObject.value.type}" element?`);
-    if (confirmDelete) {
+    if (confirm(`Delete "${selectedObject.value.type}" element?`)) {
         canvasEditorRef.value?.deleteSelected();
     }
 };
-
-const handleAddTime = () => {
-    canvasEditorRef.value?.addTimeNode();
-};
-
-const handleAddDate = () => {
-    canvasEditorRef.value?.addDateNode();
-};
-
-const handleAddWeather = () => {
-    canvasEditorRef.value?.addWeatherNode();
-};
+const handleAddTime = () => canvasEditorRef.value?.addTimeNode();
+const handleAddDate = () => canvasEditorRef.value?.addDateNode();
+const handleAddWeather = () => canvasEditorRef.value?.addWeatherNode();
 
 const handleSaveProject = () => {
     if (!canvasEditorRef.value) return;
-    
     const state = canvasEditorRef.value.exportState();
     if (!state) return;
-    
     const blob = new Blob([state], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
     const link = document.createElement('a');
     link.href = url;
     link.download = `epaper-layout-${new Date().toISOString().slice(0, 10)}.json`;
@@ -169,14 +117,12 @@ const handleLoadProject = () => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.json';
-    
     fileInput.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
         file.text().then(content => {
             try {
-                JSON.parse(content); // Validate JSON
+                JSON.parse(content);
                 if (canvasEditorRef.value) {
                     canvasEditorRef.value.importState(content);
                     localStorage.setItem('epaper_dash_layout', content);
@@ -187,11 +133,9 @@ const handleLoadProject = () => {
             }
         });
     };
-    
     fileInput.click();
 };
 
-// Keyboard handling
 const handleKeydown = (e) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
         if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
@@ -203,25 +147,20 @@ const handleKeydown = (e) => {
 const handleCanvasChange = () => {
     if (canvasEditorRef.value) {
         const state = canvasEditorRef.value.exportState();
-        if (state) {
-            localStorage.setItem('epaper_dash_layout', state);
-        }
+        if (state) localStorage.setItem('epaper_dash_layout', state);
     }
 };
 
 const handleSelected = (obj) => {
-    // Clone to avoid direct mutation issues
     selectedObject.value = obj ? { ...obj } : null;
 };
 
-// Watch for property changes in the side panel and update canvas
 watch(selectedObject, (newVal) => {
     if (newVal && canvasEditorRef.value) {
         const updateAttrs = {
             x: Math.round(newVal.x),
             y: Math.round(newVal.y)
         };
-
         if (newVal.type === 'Text') {
             updateAttrs.text = newVal.text;
             updateAttrs.fontSize = Math.round(newVal.fontSize);
@@ -234,9 +173,8 @@ watch(selectedObject, (newVal) => {
             updateAttrs.scaleX = 1;
             updateAttrs.scaleY = 1;
         }
-
         canvasEditorRef.value.updateNode(newVal.id, updateAttrs);
-        handleCanvasChange(); // Save on manual change
+        handleCanvasChange();
     }
 }, { deep: true });
 </script>
@@ -244,8 +182,9 @@ watch(selectedObject, (newVal) => {
 <template>
   <div class="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
     
-    <!-- Left Sidebar: Tools -->
+    <!-- Left Sidebar: Tools (Now wider and improved) -->
     <ToolSidebar 
+      class="z-30 h-full bg-white/80 backdrop-blur-xl border-r border-gray-200/60"
       @add-text="handleAddText" 
       @add-image="handleAddImage"
       @add-time="handleAddTime"
@@ -254,31 +193,41 @@ watch(selectedObject, (newVal) => {
     />
 
     <!-- Center: Workspace -->
-    <main class="flex-1 flex flex-col relative min-w-0 bg-gray-100">
-      <!-- Topbar -->
+    <main class="flex-1 flex flex-col relative min-w-0 bg-gray-100 dot-grid">
+      
+      <!-- New App Header (Floating Top) -->
       <AppHeader
-        :is-connected="isConnected"
-        :is-uploading="isUploading"
-        v-model:selected-display="selectedDisplay"
-        v-model:selected-color-mode="selectedColorMode"
-        @connect="handleConnect"
-        @upload="handleUpload"
         @save="handleSaveProject"
         @load="handleLoadProject"
-        @open-settings="isSettingsOpen = true"
-        @toggle-console="isConsoleOpen = !isConsoleOpen"
       />
 
-      <!-- Edit Toolbar -->
-      <EditToolbar
-        @toggle-grid="handleToggleGrid"
-        @bring-to-front="handleBringToFront"
-        @send-to-back="handleSendToBack"
-        @copy="handleCopy"
-        @delete="handleDelete"
-      />
+      <!-- Device Toolbar (Floating Island) -->
+      <div class="absolute top-4 left-1/2 -translate-x-1/2 z-40">
+        <DeviceToolbar 
+            :is-connected="isConnected"
+            :is-uploading="isUploading"
+            v-model:selected-display="selectedDisplay"
+            v-model:selected-color-mode="selectedColorMode"
+            @connect="handleConnect"
+            @upload="handleUpload"
+            @open-settings="isSettingsOpen = true"
+            @toggle-console="isConsoleOpen = !isConsoleOpen"
+        />
+      </div>
+
+      <!-- Edit Toolbar (Floating Bottom Center) -->
+      <!-- Adjusted positioning to floating style -->
+      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
+          <EditToolbar
+            @toggle-grid="handleToggleGrid"
+            @bring-to-front="handleBringToFront"
+            @send-to-back="handleSendToBack"
+            @copy="handleCopy"
+            @delete="handleDelete"
+          />
+      </div>
       
-      <div class="flex-1 relative overflow-hidden flex flex-col">
+      <div class="flex-1 relative overflow-hidden flex flex-col pt-0">
          <CanvasEditor 
             class="flex-1 w-full h-full"
             ref="canvasEditorRef" 
@@ -290,11 +239,16 @@ watch(selectedObject, (newVal) => {
       </div>
     </main>
 
-    <!-- Right Sidebar: Properties -->
-    <PropertiesPanel
-      :selected-object="selectedObject"
-      :selected-color-mode="selectedColorMode"
-    />
+    <!-- Right Sidebar: Properties (Docked but floating look) -->
+    <aside class="w-72 h-full z-20 flex flex-col pointer-events-none p-4">
+        <div class="bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl rounded-2xl flex-1 flex flex-col overflow-hidden pointer-events-auto">
+            <PropertiesPanel
+                class="h-full"
+                :selected-object="selectedObject"
+                :selected-color-mode="selectedColorMode"
+            />
+        </div>
+    </aside>
 
     <!-- Dialogs -->
     <DeviceSettingsDialog 
@@ -314,9 +268,8 @@ watch(selectedObject, (newVal) => {
 </template>
 
 <style>
-/* Global resets if needed */
 body {
     margin: 0;
-    overflow: hidden; /* Prevent native scroll */
+    overflow: hidden;
 }
 </style>
