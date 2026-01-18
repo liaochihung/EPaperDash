@@ -46,6 +46,11 @@ const {
     getPartialDataURL,
     addRect,
     addCircle,
+    addTriangle,
+    addStar,
+    addHeart,
+    addLine,
+    addArrow,
     addBatteryNode,
     undo,
     redo,
@@ -111,6 +116,11 @@ defineExpose({
     redo,
     addRect,
     addCircle,
+    addTriangle,
+    addStar,
+    addHeart,
+    addLine,
+    addArrow,
     addBatteryNode,
     canUndo,
     canRedo,
@@ -141,6 +151,11 @@ const handleDrop = (e) => {
             case 'weather-icon': addWeatherIconNode(pos); break;
             case 'rect': addRect(pos); break;
             case 'circle': addCircle(pos); break;
+            case 'triangle': addTriangle(pos); break;
+            case 'star': addStar(pos); break;
+            case 'heart': addHeart(pos); break;
+            case 'line': addLine(pos); break;
+            case 'arrow': addArrow(pos); break;
             case 'battery': addBatteryNode(pos); break;
             default: break;
         }

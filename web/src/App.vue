@@ -100,10 +100,13 @@ const handleUndo = () => canvasEditorRef.value?.undo();
 const handleRedo = () => canvasEditorRef.value?.redo();
 const handleAddTime = () => canvasEditorRef.value?.addTimeNode();
 const handleAddDate = () => canvasEditorRef.value?.addDateNode();
-const handleAddWeather = () => canvasEditorRef.value?.addWeatherNode();
 const handleAddRect = () => canvasEditorRef.value?.addRect();
 const handleAddCircle = () => canvasEditorRef.value?.addCircle();
-const handleAddBattery = () => canvasEditorRef.value?.addBatteryNode();
+const handleAddTriangle = () => canvasEditorRef.value?.addTriangle();
+const handleAddStar = () => canvasEditorRef.value?.addStar();
+const handleAddHeart = () => canvasEditorRef.value?.addHeart();
+const handleAddLine = () => canvasEditorRef.value?.addLine();
+const handleAddArrow = () => canvasEditorRef.value?.addArrow();
 const handleSelectAll = () => canvasEditorRef.value?.selectAll();
 
 // Weather sub-components
@@ -240,10 +243,13 @@ watch(selectedObject, (newVal) => {
       @add-image="handleAddImage"
       @add-time="handleAddTime"
       @add-date="handleAddDate"
-      @add-weather="handleAddWeather"
       @add-rect="handleAddRect"
       @add-circle="handleAddCircle"
-      @add-battery="handleAddBattery"
+      @add-triangle="handleAddTriangle"
+      @add-star="handleAddStar"
+      @add-heart="handleAddHeart"
+      @add-line="handleAddLine"
+      @add-arrow="handleAddArrow"
       @add-weather-temp="handleAddWeatherTemp"
       @add-weather-humidity="handleAddWeatherHumidity"
       @add-weather-wind="handleAddWeatherWind"

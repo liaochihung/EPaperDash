@@ -2,8 +2,8 @@
 import { ref } from 'vue';
 
 const emit = defineEmits([
-    'add-text', 'add-image', 'add-time', 'add-date', 'add-weather', 
-    'add-rect', 'add-circle', 'add-battery',
+    'add-text', 'add-image', 'add-time', 'add-date',
+    'add-rect', 'add-circle', 'add-triangle', 'add-star', 'add-heart', 'add-line', 'add-arrow',
     // Weather sub-components
     'add-weather-temp', 'add-weather-humidity', 'add-weather-wind', 'add-weather-precip', 'add-weather-icon'
 ]);
@@ -90,16 +90,66 @@ const handleDragStart = (e, type, payload = null) => {
                     <div 
                         class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
                         draggable="true"
-                        @dragstart="(e) => handleDragStart(e, 'battery')"
-                        @click="$emit('add-battery')" 
+                        @dragstart="(e) => handleDragStart(e, 'triangle')"
+                        @click="$emit('add-triangle')" 
                     >
-                        <!-- Simple Battery Icon -->
+                        <!-- Triangle Icon -->
                         <svg class="h-6 w-6 text-gray-800 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18v-2a6 6 0 016-6v0a6 6 0 016 6v2a6 6 0 01-6 6v0a6 6 0 01-6-6zm-6-2v2a6 6 0 016 6v0a6 6 0 016-6v-2a6 6 0 01-6-6v0a6 6 0 01-6 6z" style="display:none" /> 
-                           <!-- Real Battery Path -->
-                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10V6a2 2 0 012-2h10a2 2 0 012 2v4M3 14v4a2 2 0 002 2h10a2 2 0 002-2v-4M21 10v4" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4l8 14H4L12 4z" />
                         </svg>
-                        <span class="text-[10px] text-gray-500 uppercase font-medium">Battery</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Triangle</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-yellow-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'star')"
+                        @click="$emit('add-star')" 
+                    >
+                        <!-- Star Icon -->
+                        <svg class="h-6 w-6 text-gray-800 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Star</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-red-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'heart')"
+                        @click="$emit('add-heart')" 
+                    >
+                        <!-- Heart Icon -->
+                        <svg class="h-6 w-6 text-gray-800 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Heart</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'line')"
+                        @click="$emit('add-line')" 
+                    >
+                        <!-- Line Icon -->
+                        <svg class="h-6 w-6 text-gray-800 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Line</span>
+                    </div>
+
+                    <div 
+                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
+                        draggable="true"
+                        @dragstart="(e) => handleDragStart(e, 'arrow')"
+                        @click="$emit('add-arrow')" 
+                    >
+                        <!-- Arrow Icon -->
+                        <svg class="h-6 w-6 text-gray-800 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                        <span class="text-[10px] text-gray-500 uppercase font-medium">Arrow</span>
                     </div>
                 </div>
             </div>
@@ -137,16 +187,10 @@ const handleDragStart = (e, type, payload = null) => {
                         <span class="text-[10px] text-gray-500 uppercase font-medium">Date</span>
                     </div>
 
-                    <div 
-                        class="h-20 bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-0.5"
-                        draggable="true"
-                        @dragstart="(e) => handleDragStart(e, 'weather')"
-                        @click="$emit('add-weather')"
-                    >
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-700 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                        </svg>
-                        <span class="text-[10px] text-gray-500 uppercase font-medium">Weather</span>
+                    <!-- Weather Sub-header -->
+                    <div class="col-span-2 flex items-center gap-2 mt-1">
+                        <span class="text-[9px] text-gray-400 uppercase font-semibold tracking-wide">Weather</span>
+                        <div class="flex-1 h-px bg-gray-200"></div>
                     </div>
 
                     <!-- Weather Sub-Components -->

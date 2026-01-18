@@ -1056,6 +1056,115 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         emit('change');
     };
 
+    const addTriangle = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const size = 80;
+        const height = size * Math.sqrt(3) / 2;
+        const triangle = new Konva.Line({
+            x: pos.x,
+            y: pos.y,
+            points: [size / 2, 0, size, height, 0, height],
+            closed: true,
+            fill: 'transparent',
+            stroke: 'black',
+            strokeWidth: 2,
+            draggable: true,
+            id: `triangle-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(triangle);
+        paperGroup.value.add(triangle);
+        selectNode(triangle);
+        saveHistory();
+        emit('change');
+    };
+
+    const addStar = (pos = { x: 100, y: 100 }) => {
+        if (!paperGroup.value) return;
+        const star = new Konva.Star({
+            x: pos.x,
+            y: pos.y,
+            numPoints: 5,
+            innerRadius: 25,
+            outerRadius: 50,
+            fill: 'transparent',
+            stroke: 'black',
+            strokeWidth: 2,
+            draggable: true,
+            id: `star-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(star);
+        paperGroup.value.add(star);
+        selectNode(star);
+        saveHistory();
+        emit('change');
+    };
+
+    const addHeart = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        // Heart shape using bezier curves approximation via Path
+        const heart = new Konva.Path({
+            x: pos.x,
+            y: pos.y,
+            data: 'M 40 20 C 40 10 30 0 20 0 C 10 0 0 10 0 20 C 0 40 20 55 40 70 C 60 55 80 40 80 20 C 80 10 70 0 60 0 C 50 0 40 10 40 20 Z',
+            fill: 'transparent',
+            stroke: 'black',
+            strokeWidth: 2,
+            scaleX: 0.8,
+            scaleY: 0.8,
+            draggable: true,
+            id: `heart-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(heart);
+        paperGroup.value.add(heart);
+        selectNode(heart);
+        saveHistory();
+        emit('change');
+    };
+
+    const addLine = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const line = new Konva.Line({
+            x: pos.x,
+            y: pos.y,
+            points: [0, 0, 100, 0],
+            stroke: 'black',
+            strokeWidth: 2,
+            draggable: true,
+            id: `line-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(line);
+        paperGroup.value.add(line);
+        selectNode(line);
+        saveHistory();
+        emit('change');
+    };
+
+    const addArrow = (pos = { x: 50, y: 50 }) => {
+        if (!paperGroup.value) return;
+        const arrow = new Konva.Arrow({
+            x: pos.x,
+            y: pos.y,
+            points: [0, 0, 100, 0],
+            pointerLength: 10,
+            pointerWidth: 10,
+            fill: 'black',
+            stroke: 'black',
+            strokeWidth: 2,
+            draggable: true,
+            id: `arrow-${Date.now()}`,
+            name: 'editable-shape'
+        });
+        setupCursorEvents(arrow);
+        paperGroup.value.add(arrow);
+        selectNode(arrow);
+        saveHistory();
+        emit('change');
+    };
+
     const addBatteryNode = (pos = { x: 50, y: 50 }) => {
         if (!paperGroup.value) return;
         const group = new Konva.Group({
@@ -1192,6 +1301,11 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         getPartialDataURL,
         addRect,
         addCircle,
+        addTriangle,
+        addStar,
+        addHeart,
+        addLine,
+        addArrow,
         addBatteryNode,
         undo,
         redo,
