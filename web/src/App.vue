@@ -220,13 +220,19 @@ watch(selectedObject, (newVal) => {
             updateAttrs.text = newVal.text;
             updateAttrs.fontSize = Math.round(newVal.fontSize);
             updateAttrs.fill = newVal.fill;
-            // Text width/height handles differently often, 
-            // but if we want to force it or if Konva Text handles it:
-            // Usually we don't force width/height on text unless it's wrappingWidth
-            // But let's pass it for now as our updateNode logic handles resetting scale.
         } else if (newVal.type === 'Image') {
              // Image logic is same as generic now via updateNode normalization
         }
+
+        // Shape properties (Rect, Circle, Star, Line, Path, Arrow)
+        const shapeTypes = ['Rect', 'Circle', 'Star', 'Line', 'Path', 'Arrow'];
+        if (shapeTypes.includes(newVal.type)) {
+            updateAttrs.fill = newVal.fill;
+            updateAttrs.stroke = newVal.stroke;
+            updateAttrs.strokeWidth = newVal.strokeWidth;
+            updateAttrs.dashStyle = newVal.dashStyle;
+        }
+
         canvasEditorRef.value.updateNode(newVal.id, updateAttrs);
         handleCanvasChange();
     }

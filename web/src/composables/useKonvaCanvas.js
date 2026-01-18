@@ -328,7 +328,22 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             nodeProps.fill = node.fill();
         }
 
-        // Custom Props for Weather Grouo
+        // Shape properties (Rect, Circle, Star, Line, Path, Arrow)
+        const shapeTypes = ['Rect', 'Circle', 'Star', 'Line', 'Path', 'Arrow'];
+        if (shapeTypes.includes(node.className)) {
+            nodeProps.fill = node.fill() || 'transparent';
+            nodeProps.stroke = node.stroke() || 'black';
+            nodeProps.strokeWidth = node.strokeWidth() || 2;
+            // Handle dash - convert array to string for UI
+            const dash = node.dash();
+            if (dash && dash.length > 0) {
+                nodeProps.dashStyle = dash.join(',');
+            } else {
+                nodeProps.dashStyle = '';
+            }
+        }
+
+        // Custom Props for Weather Group
         if (node.getAttr('nodeType') === 'weather') {
             const icon = node.findOne('.weather-icon');
             const temp = node.findOne('.weather-temp');
@@ -458,6 +473,25 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                 }
             }
 
+            // Handle shape properties
+            if (attrs.dashStyle !== undefined) {
+                // Convert dashStyle string to array for Konva
+                if (attrs.dashStyle === '' || attrs.dashStyle === 'solid') {
+                    attrs.dash = [];
+                } else if (attrs.dashStyle === 'dashed') {
+                    attrs.dash = [10, 5];
+                } else if (attrs.dashStyle === 'dotted') {
+                    attrs.dash = [2, 4];
+                } else if (attrs.dashStyle === 'dash-dot') {
+                    attrs.dash = [10, 5, 2, 5];
+                } else {
+                    // Custom: parse comma-separated values
+                    const parts = attrs.dashStyle.split(',').map(Number).filter(n => !Number.isNaN(n));
+                    attrs.dash = parts.length > 0 ? parts : [];
+                }
+                delete attrs.dashStyle;
+            }
+
             // Normal attribute updates
             if (attrs.x !== undefined) attrs.x = Math.round(attrs.x);
             if (attrs.y !== undefined) attrs.y = Math.round(attrs.y);
@@ -469,8 +503,6 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                 node.scaleY(1);
             }
 
-            node.setAttrs(attrs);
-            layer.value.batchDraw();
             node.setAttrs(attrs);
             layer.value.batchDraw();
 

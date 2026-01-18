@@ -102,6 +102,73 @@ defineProps({
                   </div>
                </div>
           </div>
+
+          <!-- Shape Properties (Rect, Circle, Star, Line, Path, Arrow) -->
+          <div v-if="['Rect', 'Circle', 'Star', 'Line', 'Path', 'Arrow'].includes(selectedObject.type)" class="space-y-3 pt-3 border-t border-gray-100">
+              <h3 class="text-xs font-semibold text-purple-500 uppercase tracking-wider block">Shape Style</h3>
+              
+              <!-- Fill Color -->
+              <div class="space-y-2">
+                  <span class="block text-xs text-gray-500">Fill Color</span>
+                  <div class="flex flex-wrap gap-2">
+                      <button 
+                        @click="selectedObject.fill = 'transparent'"
+                        :class="{ 'ring-2 ring-blue-500 ring-offset-2': selectedObject.fill === 'transparent' }"
+                        class="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 shadow-sm transition-all hover:scale-110 flex items-center justify-center bg-white"
+                        title="Transparent"
+                      >
+                        <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                      <button 
+                        v-for="color in paletteMap[selectedColorMode.id]" 
+                        :key="'fill-' + color"
+                        @click="selectedObject.fill = color"
+                        :style="{ backgroundColor: color }"
+                        :class="{ 'ring-2 ring-blue-500 ring-offset-2': selectedObject.fill === color }"
+                        class="w-6 h-6 rounded-full border border-gray-200 shadow-sm transition-all hover:scale-110"
+                        :title="color"
+                      ></button>
+                  </div>
+              </div>
+
+              <!-- Stroke Color -->
+              <div class="space-y-2">
+                  <span class="block text-xs text-gray-500">Stroke Color</span>
+                  <div class="flex flex-wrap gap-2">
+                      <button 
+                        v-for="color in paletteMap[selectedColorMode.id]" 
+                        :key="'stroke-' + color"
+                        @click="selectedObject.stroke = color"
+                        :style="{ backgroundColor: color }"
+                        :class="{ 'ring-2 ring-blue-500 ring-offset-2': selectedObject.stroke === color }"
+                        class="w-6 h-6 rounded-full border border-gray-200 shadow-sm transition-all hover:scale-110"
+                        :title="color"
+                      ></button>
+                  </div>
+              </div>
+
+              <!-- Stroke Width -->
+              <div>
+                  <label class="block text-xs text-gray-500 mb-1">Stroke Width</label>
+                  <div class="flex items-center gap-2">
+                       <input v-model.number="selectedObject.strokeWidth" type="range" min="0" max="20" step="1" class="flex-1" />
+                       <input v-model.number="selectedObject.strokeWidth" type="number" min="0" class="w-12 px-1 py-1 bg-gray-50 border border-gray-200 rounded text-sm text-center" />
+                  </div>
+              </div>
+
+              <!-- Line Style -->
+              <div>
+                  <label class="block text-xs text-gray-500 mb-1">Line Style</label>
+                  <select v-model="selectedObject.dashStyle" class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                      <option value="">Solid</option>
+                      <option value="dashed">Dashed</option>
+                      <option value="dotted">Dotted</option>
+                      <option value="dash-dot">Dash-Dot</option>
+                  </select>
+              </div>
+          </div>
           
            <div class="pt-4 border-t border-gray-100">
                <div class="flex flex-col gap-1">
