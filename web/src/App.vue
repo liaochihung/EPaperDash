@@ -6,6 +6,7 @@ import ToolSidebar from './components/ToolSidebar.vue';
 import EditToolbar from './components/EditToolbar.vue';
 import PropertiesPanel from './components/PropertiesPanel.vue';
 import DeviceSettingsDialog from './components/DeviceSettingsDialog.vue';
+import ConsolePanel from './components/ConsolePanel.vue';
 
 import { useWebSerial } from './composables/useWebSerial';
 import { useFirmwareUpload } from './composables/useFirmwareUpload';
@@ -19,8 +20,23 @@ const { isConnected, connect, disconnect, sendBinary, sendJSON, onLineReceived }
 const isSettingsOpen = ref(false);
 const settingsDialogRef = ref(null);
 
+// Console
+const isConsoleOpen = ref(false);
+const consoleLogs = ref([]);
+
+const addLog = (text) => {
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    consoleLogs.value.push({ time, text });
+    if (consoleLogs.value.length > 500) {
+        consoleLogs.value.shift();
+    }
+};
+
 // Handle incoming serial data
 onLineReceived.value = (line) => {
+    // Always log to console
+    addLog(line);
+
     try {
         const data = JSON.parse(line);
         console.log("RX:", data);
@@ -33,6 +49,7 @@ onLineReceived.value = (line) => {
         // Handle other async responses if needed
     } catch (e) {
         // Not JSON or partial, ignore
+        // This is expected for standard debug logs
     }
 };
 
@@ -65,59 +82,7 @@ onMounted(() => {
     }
 
     // Start auto-refresh timer (every minute)
-    /* 
-    const refreshInterval = setInterval(async () => {
-        if (!canvasEditorRef.value || !isConnected.value) return;
-
-        // Get all nodes from canvas
-        const state = canvasEditorRef.value.exportState();
-        if (!state) return;
-
-        const nodes = JSON.parse(state);
-        const dynamicNodes = nodes.filter(n => n.attrs.nodeType && ['time', 'date', 'weather'].includes(n.attrs.nodeType));
-
-        if (dynamicNodes.length === 0) return;
-
-        // Update each dynamic node
-        for (const node of dynamicNodes) {
-             const nodeId = node.attrs.id;
-             let newText = node.attrs.text;
-
-             if (node.attrs.nodeType === 'time') {
-                 const now = new Date();
-                 newText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-             } else if (node.attrs.nodeType === 'date') {
-                 const now = new Date();
-                 newText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-             }
-             // Weather would require API call - skip for now
-
-             if (newText !== node.attrs.text) {
-                 // Update node text
-                 canvasEditorRef.value.updateNode(nodeId, { text: newText });
-
-                 // Increment counter
-                 updateCounter.value++;
-
-                 // Decide: Partial or Full refresh?
-                 if (updateCounter.value >= FULL_REFRESH_INTERVAL) {
-                     console.log('Full refresh triggered');
-                     await uploadToScreen(canvasEditorRef.value, selectedDisplay.value, selectedColorMode.value);
-                     updateCounter.value = 0;
-                 } else {
-                     // Partial update for this node's area
-                     const x = Math.round(node.attrs.x);
-                     const y = Math.round(node.attrs.y);
-                     const width = Math.round(node.attrs.width || 200);
-                     const height = Math.round(node.attrs.height || 50);
-                     
-                     console.log(`Partial update for ${nodeId}`);
-                     await uploadPartialUpdate(canvasEditorRef.value, x, y, width, height, selectedColorMode.value);
-                 }
-             }
-        }
-    }, 60000); // Every 60 seconds
-    */
+    // Code removed for clarity - can be re-added if dynamic features are enabled again
 
     // Cleanup on unmount
     onUnmounted(() => {
@@ -196,7 +161,7 @@ const handleSaveProject = () => {
     link.download = `epaper-layout-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
 };
 
@@ -209,9 +174,7 @@ const handleLoadProject = () => {
         const file = e.target.files[0];
         if (!file) return;
         
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const content = event.target.result;
+        file.text().then(content => {
             try {
                 JSON.parse(content); // Validate JSON
                 if (canvasEditorRef.value) {
@@ -222,8 +185,7 @@ const handleLoadProject = () => {
                 console.error("Failed to load project", err);
                 alert("Error: Invalid project file");
             }
-        };
-        reader.readAsText(file);
+        });
     };
     
     fileInput.click();
@@ -304,6 +266,7 @@ watch(selectedObject, (newVal) => {
         @save="handleSaveProject"
         @load="handleLoadProject"
         @open-settings="isSettingsOpen = true"
+        @toggle-console="isConsoleOpen = !isConsoleOpen"
       />
 
       <!-- Edit Toolbar -->
@@ -339,6 +302,13 @@ watch(selectedObject, (newVal) => {
         :is-open="isSettingsOpen"
         @close="isSettingsOpen = false"
         @send-command="handleSendCommand"
+    />
+
+    <ConsolePanel 
+        :is-open="isConsoleOpen" 
+        :logs="consoleLogs"
+        @close="isConsoleOpen = false"
+        @clear="consoleLogs = []"
     />
   </div>
 </template>
