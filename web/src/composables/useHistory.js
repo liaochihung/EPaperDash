@@ -19,6 +19,10 @@ export function useHistory(initialState = null, options = {}) {
     const pushState = (state) => {
         if (isUpdating.value) return;
 
+        // Avoid duplicate states (simple string check if it's a JSON string)
+        const currentState = history.value[currentIndex.value];
+        if (state === currentState) return;
+
         // If we are not at the end, cut off the future
         if (currentIndex.value < history.value.length - 1) {
             history.value = history.value.slice(0, currentIndex.value + 1);

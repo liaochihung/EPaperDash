@@ -68,6 +68,8 @@ const {
     toolMode,
     setToolMode,
     selectAll,
+    getNodes,
+    selectById,
     getRelativePointerPosition,
     stage // access ref if needed for cleanup
 } = useKonvaCanvas(stageContainer, props, emit);
@@ -156,7 +158,9 @@ defineExpose({
     centerStage,
     toolMode,
     setToolMode,
-    selectAll
+    selectAll,
+    getNodes,
+    selectById
 });
 
 // Handle Wheel Zoom

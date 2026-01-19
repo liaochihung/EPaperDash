@@ -282,9 +282,23 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         }
     };
 
+    const handleGlobalMouseUp = () => {
+        if (isSelecting.value) {
+            isSelecting.value = false;
+            if (selectionRect.value) {
+                selectionRect.value.visible(false);
+            }
+            if (layer.value) {
+                layer.value.batchDraw();
+            }
+        }
+    };
+
     onUnmounted(() => {
         window.removeEventListener('keydown', handleKeyDown);
         window.removeEventListener('keyup', handleKeyUp);
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+        window.removeEventListener('touchend', handleGlobalMouseUp);
     });
 
     const setupEvents = () => {
@@ -296,37 +310,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
 
 
-        // Flag to track if we just finished a drag selection
-        let justFinishedDragSelection = false;
-
-        stage.value.on('click tap', (e) => {
-            const target = e.target;
-
-            // If we just finished a drag selection, don't deselect
-            if (justFinishedDragSelection) {
-                justFinishedDragSelection = false;
-                return;
-            }
-
-            // Deselect if clicked on stage or background
-            if (target === stage.value || target.id() === 'paper-bg') {
-                transformer.value.nodes([]);
-                selectedId.value = null;
-                emit('selected', null);
-                return;
-            }
-
-            // Ignore transformer clicks
-            if (target.getParent().className === 'Transformer') return;
-
-            // Handle Group Selection (if clicked element is inside a group like Weather)
-            let nodeToSelect = target;
-            if (target.getParent() && target.getParent().name() && target.getParent().name().includes('editable-group')) {
-                nodeToSelect = target.getParent();
-            }
-
-            // Handle multi-selection with Shift/Ctrl key
-            const isMulti = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+        const handleSelectionAction = (nodeToSelect, isMulti) => {
             const currentNodes = transformer.value.nodes();
 
             if (isMulti) {
@@ -354,6 +338,27 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                 selectedId.value = nodeToSelect.id();
                 emitNodeProperties(nodeToSelect);
             }
+        };
+
+        // Flag to track if we just finished a drag selection
+        stage.value.on('click tap', (e) => {
+            const target = e.target;
+
+            // Deselect if clicked on stage or background
+            if (target === stage.value || target.id() === 'paper-bg') {
+                // If the click happened after a drag-selection, e.target might still be stage
+                // but we should only deselect if it was a "pure" click, not a box selection release.
+                // However, Konva's 'click' event already has a default distance threshold.
+                // The issue is likely that our custom selection logic is conflicting.
+
+                // Only deselect if selection box was tiny or didn't exist
+                if (!currentSelectionBox || (currentSelectionBox.width < 5 && currentSelectionBox.height < 5)) {
+                    transformer.value.nodes([]);
+                    selectedId.value = null;
+                    emit('selected', null);
+                }
+                return;
+            }
         });
 
         // State to track the logical selection box during drag
@@ -368,11 +373,25 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
         // Rubber Band Selection Logic
         stage.value.on('mousedown touchstart', (e) => {
-            if (e.target !== stage.value && e.target.id() !== 'paper-bg') {
+            if (toolMode.value !== 'select') return;
+
+            const target = e.target;
+
+            // Selection on mousedown for shapes (Responsive)
+            if (target !== stage.value && target.id() !== 'paper-bg') {
+                // Ignore transformer clicks
+                if (target.getParent() && target.getParent().className === 'Transformer') return;
+
+                // Handle Group Selection
+                let nodeToSelect = target;
+                if (target.getParent() && target.getParent().name() && target.getParent().name().includes('editable-group')) {
+                    nodeToSelect = target.getParent();
+                }
+
+                const isMulti = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+                handleSelectionAction(nodeToSelect, isMulti);
                 return;
             }
-
-            e.evt.preventDefault();
 
             // Get position relative to paperGroup (handles zoom/pan correctly)
             const pos = getLocalPointerPosition();
@@ -391,15 +410,11 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             selectionRect.value.visible(true);
             isSelecting.value = true;
 
-
-
             layer.value.batchDraw();
         });
 
         stage.value.on('mousemove touchmove', (e) => {
             if (!isSelecting.value) return;
-
-            e.evt.preventDefault();
 
             // Get position relative to paperGroup
             const pos = getLocalPointerPosition();
@@ -425,8 +440,6 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             if (!isSelecting.value) return;
             isSelecting.value = false;
             selectionRect.value.visible(false);
-
-            e.evt.preventDefault();
 
             // Use the last calculated box from mousemove, or calculate if single click/immediate up
             let box = currentSelectionBox;
@@ -477,10 +490,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
 
 
-            // Mark that we finished a drag selection (only if we actually dragged)
-            if (box.width > 5 || box.height > 5) {
-                justFinishedDragSelection = true;
-            }
+            // We don't need the flag anymore, we check box size in the click handler
 
             transformer.value.nodes(selected);
             if (selected.length > 0) {
@@ -493,6 +503,12 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
             // Force redraw
             layer.value.batchDraw();
+        });
+
+        stage.value.on('dragstart', (e) => {
+            // Ensure selection box state is cleared when dragging items
+            isSelecting.value = false;
+            currentSelectionBox = null;
         });
 
         // Snap to grid on drag
@@ -529,18 +545,32 @@ export function useKonvaCanvas(stageContainer, props, emit) {
 
                 // For Text nodes, scaling affects fontSize, not width/height usually
                 if (node.className === 'Text') {
-                    // Logic remains: scale affects font size effectively, but good to normalize if possible
-                    // But for simplicity in Konva, often keeping scale is easier for Text
-                    // If we want exact width control:
-                    // node.fontSize(node.fontSize() * scaleX);
-                    // node.width(node.width() * scaleX);
-                    // node.scaleX(1); node.scaleY(1);
-                    // Let's keep Text scaling as is for now, or just normalize
-                } else {
+                    // Text scaling is often left as is in Konva to preserve font quality
+                    // or handled by changing fontSize. But here we can leave scale.
+                } else if (node.className === 'Rect' || node.className === 'Image') {
                     node.width(node.width() * scaleX);
                     node.height(node.height() * scaleY);
                     node.scaleX(1);
                     node.scaleY(1);
+                } else if (node.className === 'Circle') {
+                    // Only normalize if scaling is uniform to avoid distortion loss
+                    if (Math.abs(scaleX - scaleY) < 0.001) {
+                        node.radius(node.radius() * scaleX);
+                        node.scaleX(1);
+                        node.scaleY(1);
+                    }
+                } else if (node.className === 'Star') {
+                    // Fix: Scale both radii to maintain star shape
+                    if (Math.abs(scaleX - scaleY) < 0.001) {
+                        const s = scaleX;
+                        node.innerRadius(node.innerRadius() * s);
+                        node.outerRadius(node.outerRadius() * s);
+                        node.scaleX(1);
+                        node.scaleY(1);
+                    }
+                } else if (node.className === 'Line' || node.className === 'Arrow') {
+                    // For lines, normalizing is complex (need to update points array)
+                    // It's safer to just keep the scale for now.
                 }
             }
 
@@ -550,6 +580,9 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             }
             saveHistory();
         });
+
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        window.addEventListener('touchend', handleGlobalMouseUp);
     };
 
     const emitNodeProperties = (node) => {
@@ -688,7 +721,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         }
     };
 
-    const updateNode = (id, attrs) => {
+    const updateNode = (id, attrs, skipHistory = false) => {
         if (!paperGroup.value) return;
         const node = paperGroup.value.findOne('#' + id);
         if (node) {
@@ -732,17 +765,35 @@ export function useKonvaCanvas(stageContainer, props, emit) {
             if (attrs.y !== undefined) attrs.y = Math.round(attrs.y);
 
             // Handle explicit Width/Height changes from props panel
-            // Reset scale if width/height are manually set to avoid confusion
             if (attrs.width !== undefined || attrs.height !== undefined) {
-                node.scaleX(1);
-                node.scaleY(1);
+                if (node.className === 'Circle') {
+                    const newRadius = (attrs.width || attrs.height || node.width()) / 2;
+                    node.radius(newRadius);
+                    delete attrs.width;
+                    delete attrs.height;
+                } else if (node.className === 'Star') {
+                    const oldWidth = node.width() * node.scaleX();
+                    const newWidth = attrs.width || oldWidth;
+                    const ratio = newWidth / oldWidth;
+                    node.innerRadius(node.innerRadius() * ratio);
+                    node.outerRadius(node.outerRadius() * ratio);
+                    delete attrs.width;
+                    delete attrs.height;
+                }
+                // Only reset scale if we've handled the normalization
+                if (['Rect', 'Image', 'Circle', 'Star'].includes(node.className)) {
+                    node.scaleX(1);
+                    node.scaleY(1);
+                }
             }
 
             node.setAttrs(attrs);
             layer.value.batchDraw();
 
             // Save history for property changes (important for Undo to work on props)
-            saveHistory();
+            if (!skipHistory) {
+                saveHistory();
+            }
             emit('change');
         }
     };
@@ -872,6 +923,10 @@ export function useKonvaCanvas(stageContainer, props, emit) {
                         }
                         return img;
                     }
+                    if (def.className === 'Star') return new Konva.Star(def.attrs);
+                    if (def.className === 'Line') return new Konva.Line(def.attrs);
+                    if (def.className === 'Path') return new Konva.Path(def.attrs);
+                    if (def.className === 'Arrow') return new Konva.Arrow(def.attrs);
                     return null;
                 };
 
@@ -1553,6 +1608,30 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         return transform.point(pos);
     };
 
+    const getNodes = () => {
+        if (!paperGroup.value) return [];
+        return paperGroup.value.getChildren(node => node.id() !== 'paper-bg' && node.id() !== 'selection-rect').map(node => ({
+            id: node.id(),
+            type: node.className,
+            nodeType: node.getAttr('nodeType') || 'basic',
+            name: node.name(),
+            visible: node.visible(),
+            zIndex: node.zIndex()
+        })).reverse(); // Reverse so top-most (last added) is first in list
+    };
+
+    const selectById = (id) => {
+        if (!paperGroup.value) return;
+        const node = paperGroup.value.findOne('#' + id);
+        if (node) {
+            selectNode(node);
+        } else {
+            transformer.value.nodes([]);
+            selectedId.value = null;
+            emit('selected', null);
+        }
+    };
+
     return {
         stage,
         initStage,
@@ -1605,6 +1684,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         toolMode,
         setToolMode,
         selectAll,
+        getNodes,
+        selectById,
         getRelativePointerPosition
     };
 }

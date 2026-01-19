@@ -1,12 +1,13 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import CanvasEditor from './components/CanvasEditor.vue';
 import AppLogo from './components/AppLogo.vue';
 import ToolSidebar from './components/ToolSidebar.vue';
 import PropertiesPanel from './components/PropertiesPanel.vue';
+import LayersPanel from './components/LayersPanel.vue'; 
 import DeviceSettingsDialog from './components/DeviceSettingsDialog.vue';
 import ConsolePanel from './components/ConsolePanel.vue';
-import DeviceToolbar from './components/DeviceToolbar.vue'; // New Import
+import DeviceToolbar from './components/DeviceToolbar.vue'; 
 
 import { useWebSerial } from './composables/useWebSerial';
 import { useFirmwareUpload } from './composables/useFirmwareUpload';
@@ -14,6 +15,7 @@ import { displayOptions, colorModes } from './constants/displays';
 
 const canvasEditorRef = ref(null);
 const selectedObject = ref(null);
+const canvasNodes = ref([]);
 const { isConnected, connect, disconnect, sendBinary, sendJSON, onLineReceived } = useWebSerial();
 
 // Dialogs
@@ -67,7 +69,8 @@ onMounted(() => {
         }, 100);
     }
     onUnmounted(() => {
-        // globalThis.removeEventListener('keydown', handleKeydown); // Optional cleanup
+        globalThis.removeEventListener('keydown', handleKeyDown);
+        globalThis.removeEventListener('keyup', handleKeyUp);
     });
 });
 
@@ -95,6 +98,14 @@ const handleDelete = () => {
         canvasEditorRef.value?.deleteSelected();
     }
 };
+
+const handleDeleteById = (id) => {
+    canvasEditorRef.value?.selectById(id);
+    setTimeout(() => {
+        handleDelete();
+    }, 0);
+};
+
 const handleUndo = () => canvasEditorRef.value?.undo();
 const handleRedo = () => canvasEditorRef.value?.redo();
 const handleAddTime = () => canvasEditorRef.value?.addTimeNode();
@@ -115,14 +126,17 @@ const resetZoom = () => canvasEditorRef.value?.resetZoom();
 const setZoom = (val) => canvasEditorRef.value?.setZoom(val);
 
 const handleZoomInput = (e) => {
-    let val = parseInt(e.target.value);
-    if (!isNaN(val)) {
+    let val = Number.parseInt(e.target.value);
+    if (!Number.isNaN(val)) {
         setZoom(val / 100);
     }
 };
 
 const toolMode = ref('select');
 const setToolMode = (mode) => canvasEditorRef.value?.setToolMode(mode);
+
+const isSpacePressed = ref(false);
+const previousToolMode = ref('select');
 
 // Weather sub-components
 const handleAddWeatherTemp = () => canvasEditorRef.value?.addWeatherTempNode();
@@ -238,6 +252,8 @@ const handleKeyUp = (e) => {
     }
 };
 
+const isUpdatingFromCanvas = ref(false);
+
 const handleCanvasChange = () => {
     if (canvasEditorRef.value) {
         const state = canvasEditorRef.value.exportState();
@@ -246,15 +262,24 @@ const handleCanvasChange = () => {
         // Update history state
         canUndo.value = canvasEditorRef.value.canUndo || false;
         canRedo.value = canvasEditorRef.value.canRedo || false;
+
+        // Update layers list
+        canvasNodes.value = canvasEditorRef.value.getNodes();
     }
 };
 
 const handleSelected = (obj) => {
+    isUpdatingFromCanvas.value = true;
     selectedObject.value = obj ? { ...obj } : null;
+    // Reset flag after next tick to ensure watcher finishes
+    setTimeout(() => {
+        isUpdatingFromCanvas.value = false;
+    }, 0);
 };
 
 watch(selectedObject, (newVal) => {
     if (newVal && canvasEditorRef.value) {
+        // Only trigger update if it NOT caused by a canvas event (e.g. user editing in sidebar)
         const updateAttrs = {
             x: Math.round(newVal.x),
             y: Math.round(newVal.y),
@@ -274,11 +299,9 @@ watch(selectedObject, (newVal) => {
             updateAttrs.text = newVal.text;
             updateAttrs.fontSize = Math.round(newVal.fontSize);
             updateAttrs.fill = newVal.fill;
-        } else if (newVal.type === 'Image') {
-             // Image logic is same as generic now via updateNode normalization
         }
 
-        // Shape properties (Rect, Circle, Star, Line, Path, Arrow)
+        // Shape properties
         const shapeTypes = ['Rect', 'Circle', 'Star', 'Line', 'Path', 'Arrow'];
         if (shapeTypes.includes(newVal.type)) {
             updateAttrs.fill = newVal.fill;
@@ -287,7 +310,8 @@ watch(selectedObject, (newVal) => {
             updateAttrs.dashStyle = newVal.dashStyle;
         }
 
-        canvasEditorRef.value.updateNode(newVal.id, updateAttrs);
+        // If change comes from Sidebar, we want history. If from Canvas, we skip (it already saved).
+        canvasEditorRef.value.updateNode(newVal.id, updateAttrs, isUpdatingFromCanvas.value);
         handleCanvasChange();
     }
 }, { deep: true });
@@ -492,14 +516,27 @@ watch(selectedObject, (newVal) => {
       </footer>
     </main>
 
-    <!-- Right Sidebar: Properties (Docked but floating look) -->
-    <aside class="w-72 h-full z-20 flex flex-col pointer-events-none p-4">
+    <!-- Right Sidebar: Properties & Layers (Docked but floating look) -->
+    <aside class="w-72 h-full z-20 flex flex-col pointer-events-none p-4 pb-14">
         <div class="bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl rounded-2xl flex-1 flex flex-col overflow-hidden pointer-events-auto">
-            <PropertiesPanel
-                class="h-full"
-                :selected-object="selectedObject"
-                :selected-color-mode="selectedColorMode"
-            />
+            <!-- Properties Panel (Top Half) -->
+            <div class="flex-[3] overflow-hidden border-b border-gray-100 flex flex-col">
+              <PropertiesPanel
+                  class="flex-1 overflow-y-auto"
+                  :selected-object="selectedObject"
+                  :selected-color-mode="selectedColorMode"
+              />
+            </div>
+            
+            <!-- Layers Panel (Bottom Half) -->
+            <div class="flex-[2] overflow-hidden flex flex-col">
+              <LayersPanel 
+                :nodes="canvasNodes"
+                :selected-id="selectedObject?.id"
+                @select="(id) => canvasEditorRef?.selectById(id)"
+                @delete="handleDeleteById"
+              />
+            </div>
         </div>
     </aside>
 
@@ -524,5 +561,20 @@ watch(selectedObject, (newVal) => {
 body {
     margin: 0;
     overflow: hidden;
+}
+
+/* Custom Scrollbar for a premium look */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>
