@@ -166,14 +166,17 @@ const handleSaveProject = () => {
 const handleNewProject = () => {
     if (!canvasEditorRef.value) return;
     
-    // Check if there are unsaved changes (isDirty is a computed ref)
+    // Check if there are unsaved changes or items on canvas
     const isDirtyValue = canvasEditorRef.value.isDirty?.value ?? false;
+    const hasNodes = (canvasEditorRef.value.getNodes?.().length ?? 0) > 0;
     
-    if (isDirtyValue) {
-        // Ask if user wants to discard or save first
-        const saveFirst = confirm('You have unsaved changes. Click OK to save first, or Cancel to discard and create new.');
-        if (saveFirst) {
-            handleSaveProject();
+    if (isDirtyValue || hasNodes) {
+        const message = isDirtyValue 
+            ? 'You have unsaved changes. Creating a new project will delete all current work. Continue?'
+            : 'Clear current workspace and start a new project?';
+            
+        if (!confirm(message)) {
+            return;
         }
     }
     
@@ -185,6 +188,16 @@ const handleNewProject = () => {
 };
 
 const handleLoadProject = () => {
+    if (!canvasEditorRef.value) return;
+
+    // Check if there are unsaved changes
+    const isDirtyValue = canvasEditorRef.value.isDirty?.value ?? false;
+    if (isDirtyValue) {
+        if (!confirm('You have unsaved changes. Loading a new project will discard them. Continue?')) {
+            return;
+        }
+    }
+
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.json';
@@ -197,6 +210,8 @@ const handleLoadProject = () => {
                 if (canvasEditorRef.value) {
                     canvasEditorRef.value.importState(content);
                     localStorage.setItem('epaper_dash_layout', content);
+                    // Mark as saved after loading
+                    canvasEditorRef.value.markSaved?.();
                 }
             } catch (err) {
                 console.error("Failed to load project", err);
@@ -356,6 +371,9 @@ watch(selectedObject, (newVal) => {
               <div class="flex items-center gap-0.5">
                   <button @click="handleNewProject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 transition-colors" title="New Project (Ctrl+N)">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </button>
+                  <button @click="handleLoadProject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 transition-colors" title="Load Project (Ctrl+O)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                   </button>
                   <button @click="handleSaveProject" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 transition-colors" title="Save Project (Ctrl+S)">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>

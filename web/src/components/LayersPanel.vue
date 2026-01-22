@@ -34,7 +34,7 @@ const getNodeIcon = (node) => {
 <template>
   <div class="flex flex-col h-full bg-white border-t border-gray-100 overflow-hidden">
     <div class="h-10 border-b border-gray-100 flex items-center px-4 bg-gray-50/50">
-      <h2 class="font-bold text-xs text-gray-500 uppercase tracking-wide">Layers</h2>
+      <h2 class="font-bold text-xs text-gray-500 uppercase tracking-wide">Elements</h2>
       <span class="ml-auto text-[10px] text-gray-400 font-mono">{{ nodes.length }} items</span>
     </div>
     
