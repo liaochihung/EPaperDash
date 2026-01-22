@@ -294,11 +294,19 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         }
     };
 
+    const handleWindowFocus = () => {
+        // Reset states when window regains focus (e.g. after file dialog)
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
+        if (layer.value) layer.value.batchDraw();
+    };
+
     onUnmounted(() => {
         window.removeEventListener('keydown', handleKeyDown);
         window.removeEventListener('keyup', handleKeyUp);
         window.removeEventListener('mouseup', handleGlobalMouseUp);
         window.removeEventListener('touchend', handleGlobalMouseUp);
+        window.removeEventListener('focus', handleWindowFocus);
     });
 
     const setupEvents = () => {
@@ -307,6 +315,7 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         // Keyboard events
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('focus', handleWindowFocus);
 
 
 
@@ -671,25 +680,37 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
 
-    const addImage = (url, pos = { x: 50, y: 50 }) => {
+    const addImage = (url, pos = null) => {
         if (!paperGroup.value) return;
+
+        // Default position if not provided: center of viewport or 50,50
+        const finalPos = pos || { x: 50, y: 50 };
+
         Konva.Image.fromURL(url, (img) => {
             img.setAttrs({
-                x: pos.x,
-                y: pos.y,
+                x: finalPos.x,
+                y: finalPos.y,
                 width: 200,
                 height: 200,
                 draggable: true,
                 id: `image-${Date.now()}`,
+                name: 'editable-image',
                 imageSrc: url
             });
             setupCursorEvents(img);
             paperGroup.value.add(img);
             selectNode(img);
+
+            // Reset selection state to prevent stickiness
+            isSelecting.value = false;
+            if (selectionRect.value) selectionRect.value.visible(false);
+
             saveHistory();
             emit('change');
         });
@@ -1102,6 +1123,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1174,6 +1197,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(group);
         paperGroup.value.add(group);
         selectNode(group);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1205,6 +1230,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1234,6 +1261,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1262,6 +1291,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1290,6 +1321,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1318,6 +1351,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1346,6 +1381,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(text);
         paperGroup.value.add(text);
         selectNode(text);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1367,6 +1404,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(rect);
         paperGroup.value.add(rect);
         selectNode(rect);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1387,6 +1426,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(circle);
         paperGroup.value.add(circle);
         selectNode(circle);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1410,6 +1451,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(triangle);
         paperGroup.value.add(triangle);
         selectNode(triangle);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1432,6 +1475,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(star);
         paperGroup.value.add(star);
         selectNode(star);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1455,6 +1500,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(heart);
         paperGroup.value.add(heart);
         selectNode(heart);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1474,6 +1521,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(line);
         paperGroup.value.add(line);
         selectNode(line);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };
@@ -1496,6 +1545,8 @@ export function useKonvaCanvas(stageContainer, props, emit) {
         setupCursorEvents(arrow);
         paperGroup.value.add(arrow);
         selectNode(arrow);
+        isSelecting.value = false;
+        if (selectionRect.value) selectionRect.value.visible(false);
         saveHistory();
         emit('change');
     };

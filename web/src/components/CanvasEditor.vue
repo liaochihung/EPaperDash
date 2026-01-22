@@ -154,7 +154,6 @@ defineExpose({
     zoomIn,
     zoomOut,
     resetZoom,
-    setZoom,
     centerStage,
     toolMode,
     setToolMode,
@@ -191,12 +190,32 @@ const handleDrop = (e) => {
     const pos = getRelativePointerPosition();
     
     try {
+        // 1. Handle File Drop (from desktop/folder)
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (evt) => addImage(evt.target.result, pos);
+                reader.readAsDataURL(file);
+                return;
+            }
+        }
+
+        // 2. Handle Tool Drop (from sidebar)
         const raw = e.dataTransfer.getData('application/json');
         if (!raw) return;
-        const { type } = JSON.parse(raw);
+        const { type, payload } = JSON.parse(raw);
         
         switch (type) {
             case 'text': addText(pos); break;
+            case 'image': 
+                if (payload) {
+                    addImage(payload, pos);
+                } else {
+                    // This case handles if we ever make the image tool draggable without payload
+                    // but usually images need a file picker
+                }
+                break;
             case 'time': addTimeNode(pos); break;
             case 'date': addDateNode(pos); break;
             case 'weather': addWeatherNode(pos); break;
